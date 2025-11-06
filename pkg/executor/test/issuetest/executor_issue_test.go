@@ -178,6 +178,27 @@ func TestIssue28650(t *testing.T) {
 	}
 }
 
+func TestIssueWill(t *testing.T) {
+	store := testkit.CreateMockStore(t)
+	tk := testkit.NewTestKit(t, store)
+	tk.MustExec("use test")
+	tk.MustExec("drop table if exists t1, t2;")
+	tk.MustExec("create table t1(a int, index will_a (a));")
+	tk.MustExec("insert into t1 values (1)")
+	tk.MustExec("insert into t1 select convert( RAND() * 100000 % 100000, UNSIGNED);")
+	tk.MustExec("insert into t1 select convert( RAND() * 100000 % 100000, UNSIGNED);")
+	tk.MustExec("insert into t1 select convert( RAND() * 100000 % 100000, UNSIGNED);")
+	tk.MustExec("insert into t1 select convert( RAND() * 100000 % 100000, UNSIGNED);")
+	tk.MustExec("create table t2(a int, c int, b char(50), index will_c (a,c,b));")
+	tk.MustExec("insert into t2 values (1,1,1);")
+	tk.MustExec("insert into t2 select convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED) from t2;")
+	tk.MustExec("insert into t2 select convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED) from t2;")
+	tk.MustExec("insert into t2 select convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED) from t2;")
+	tk.MustExec("insert into t2 select convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED), convert( RAND() * 100000 % 100000, UNSIGNED) from t2;")
+	tk.MustExec(`SELECT * FROM t2 WHERE t2.a > 1 or t2.c = 5`)
+	tk.MustExec(`SELECT * FROM t1 INNER JOIN t2 ON t1.a + 1 = t2.a where t2.a > 1 or t2.c = 5`)
+}
+
 func TestIssue30289(t *testing.T) {
 	fpName := "github.com/pingcap/tidb/pkg/executor/join/issue30289"
 	store := testkit.CreateMockStore(t)

@@ -116,6 +116,27 @@ func (ran *Range) IsPoint(sctx *rangerctx.RangerContext) bool {
 	return ran.isPoint(sctx.TypeCtx, sctx.RegardNULLAsPoint)
 }
 
+func isPointImpl(tc types.Context, a types.Datum, b types.Datum, coll collate.Collator, regardNullAsPoint bool) bool {
+	if a.Kind() == types.KindMinNotNull || b.Kind() == types.KindMaxValue {
+		return false
+	}
+	cmp, err := a.Compare(tc, &b, coll)
+	if err != nil {
+		return false
+	}
+	if cmp != 0 {
+		return false
+	}
+
+	if a.IsNull() && b.IsNull() { // [NULL, NULL]
+		if !regardNullAsPoint {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (ran *Range) isPoint(tc types.Context, regardNullAsPoint bool) bool {
 	if len(ran.LowVal) != len(ran.HighVal) {
 		return false
@@ -123,21 +144,9 @@ func (ran *Range) isPoint(tc types.Context, regardNullAsPoint bool) bool {
 	for i := range ran.LowVal {
 		a := ran.LowVal[i]
 		b := ran.HighVal[i]
-		if a.Kind() == types.KindMinNotNull || b.Kind() == types.KindMaxValue {
+		coll := ran.Collators[i]
+		if !isPointImpl(tc, a, b, coll, regardNullAsPoint) {
 			return false
-		}
-		cmp, err := a.Compare(tc, &b, ran.Collators[i])
-		if err != nil {
-			return false
-		}
-		if cmp != 0 {
-			return false
-		}
-
-		if a.IsNull() && b.IsNull() { // [NULL, NULL]
-			if !regardNullAsPoint {
-				return false
-			}
 		}
 	}
 	return !ran.LowExclude && !ran.HighExclude

@@ -106,6 +106,7 @@ func detachColumnDNFConditions(sctx expression.BuildContext, conditions []expres
 // when we find the ref col is with not null flag, it will output zero constant
 // which breaks the function check outside. That's why we abandon the nulleq range detecting,
 // treat it as non-eq-in condition for later range build.
+// XXX Does this mirror ExtractAccessConditionsForColumn???
 func getPotentialEqOrInColOffset(sctx *rangerctx.RangerContext, expr expression.Expression, cols []*expression.Column) int {
 	evalCtx := sctx.ExprCtx.GetEvalCtx()
 	f, ok := expr.(*expression.ScalarFunction)
@@ -381,6 +382,49 @@ func chooseBetweenRangeAndPoint(sctx *rangerctx.RangerContext, r1 *DetachRangeRe
 			}
 		}
 	}
+}
+
+// detachCNFCondAndBuildRangeForIndex2 will detach the index filters from table filters. These conditions are connected with `and`
+// It will first find the point query column and then extract the range query column.
+// considerDNF is true means it will try to extract access conditions from the DNF expressions.
+func (d *rangeDetacher) detachCNFCondAndBuildRangeForIndex2(conditions []expression.Expression, considerDNF bool) (*DetachRangeResult, error) {
+	res := &DetachRangeResult{}
+
+	//if len(d.cols) > 0 && strings.HasPrefix(d.cols[0].OrigName, "test.t2.") {
+	rb, success := MakeRangeBuilder(d, conditions, d.cols, d.lengths)
+	if !success {
+		return res, nil
+	}
+	// do I need accessConds by column?  do I need columnValues?
+	ranges, accessConds, remainedConds, columnValues, success := rb.buildRange(d, d.cols)
+
+	ranges, err := UnionRanges(d.sctx, ranges, true)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	if len(ranges) == 0 {
+		return res, nil
+	}
+
+	eqOrInCount := math.MaxInt
+
+	for _, r := range ranges {
+		l := len(r.LowVal)
+		if l < res.EqOrInCount {
+			res.EqOrInCount = l
+		}
+	}
+	eqCount := eqOrInCount
+
+	// How are these used?
+	res.EqCondCount = eqCount
+	res.EqOrInCount = eqOrInCount
+
+	res.Ranges = ranges
+	res.AccessConds = accessConds
+	res.RemainedConds = remainedConds
+	res.ColumnValues = columnValues
+	return res, nil
 }
 
 // detachCNFCondAndBuildRangeForIndex will detach the index filters from table filters. These conditions are connected with `and`
