@@ -284,7 +284,7 @@ func MakeRangeBuilder(
 		// This should probably be merged with the code above.
 		success = and.finalize(d)
 	}
-	return RangeBuilder{filters, and, and.cols}, success
+	return RangeBuilder{filters, and, and.cols}, true
 }
 
 /*
@@ -333,6 +333,7 @@ func copyRangeCollector(rng rangeCollector) rangeCollector {
 	newRng := makeRangeCollector(cap(rng.points))
 	copy(newRng.points, rng.points)
 	copy(newRng.collators, rng.collators)
+	newRng.columnValues = rng.columnValues
 	newRng.depth = rng.depth + 1
 	return newRng
 }
@@ -480,5 +481,6 @@ func (rb RangeBuilder) buildRange(
 	}
 
 	rngs, exprs, filters, success := rb.and.getRangeCols(d, rng, colmap)
+	filters = append(filters, rb.filterExprs...)
 	return rngs, exprs, filters, rng.columnValues, success
 }

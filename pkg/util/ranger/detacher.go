@@ -1059,6 +1059,37 @@ type DetachRangeResult struct {
 	MinAccessCondsForDNFCond int
 }
 
+func DetachCondAndBuildRangeForIndex2(sctx *rangerctx.RangerContext, conditions []expression.Expression, cols []*expression.Column,
+	lengths []int, rangeMaxSize int64) (*DetachRangeResult, error) {
+	return detachCondAndBuildRange2(sctx, conditions, cols, lengths, rangeMaxSize, true, true)
+}
+
+// detachCondAndBuildRange detaches the index filters from table filters and uses them to build ranges.
+func detachCondAndBuildRange2(sctx *rangerctx.RangerContext, conditions []expression.Expression, cols []*expression.Column,
+	lengths []int, rangeMaxSize int64, convertToSortKey bool, mergeConsecutive bool) (*DetachRangeResult, error) {
+	newTpSlice := make([]*types.FieldType, 0, len(cols))
+	for _, col := range cols {
+		newTpSlice = append(newTpSlice, newFieldType(col.RetType))
+	}
+
+	return detachCondAndBuildRangeRecursive2(sctx, conditions, cols, lengths, newTpSlice, rangeMaxSize, convertToSortKey, mergeConsecutive)
+}
+
+func detachCondAndBuildRangeRecursive2(sctx *rangerctx.RangerContext, conditions []expression.Expression, cols []*expression.Column,
+	lengths []int, newTpSlice []*types.FieldType, rangeMaxSize int64, convertToSortKey bool, mergeConsecutive bool) (*DetachRangeResult, error) {
+	d := &rangeDetacher{
+		sctx:             sctx,
+		allConds:         conditions,
+		cols:             cols,
+		lengths:          lengths,
+		newTpSlice:       newTpSlice,
+		mergeConsecutive: mergeConsecutive,
+		convertToSortKey: convertToSortKey,
+		rangeMaxSize:     rangeMaxSize,
+	}
+	return d.detachCNFCondAndBuildRangeForIndex2(d.allConds, true)
+}
+
 // DetachCondAndBuildRangeForIndex will detach the index filters from table filters.
 // rangeMaxSize is the max memory limit for ranges. O indicates no memory limit. If you ask that all conditions must be used
 // for building ranges, set rangeMemQuota to 0 to avoid range fallback.
