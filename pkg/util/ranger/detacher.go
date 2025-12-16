@@ -397,13 +397,17 @@ func (d *rangeDetacher) detachCNFCondAndBuildRangeForIndex2(conditions []express
 	}
 	// do I need accessConds by column?  do I need columnValues?
 	ranges, accessConds, remainedConds, columnValues, success := rb.buildRange(d, d.cols)
+	res.AccessConds = accessConds
+	res.RemainedConds = remainedConds
+	res.ColumnValues = columnValues
+
+	if len(ranges) == 0 {
+		return res, nil
+	}
 
 	ranges, err := UnionRanges(d.sctx, ranges, true)
 	if err != nil {
 		return nil, errors.Trace(err)
-	}
-	if len(ranges) == 0 {
-		return res, nil
 	}
 
 	eqOrInCount := math.MaxInt
@@ -421,9 +425,6 @@ func (d *rangeDetacher) detachCNFCondAndBuildRangeForIndex2(conditions []express
 	res.EqOrInCount = eqOrInCount
 
 	res.Ranges = ranges
-	res.AccessConds = accessConds
-	res.RemainedConds = remainedConds
-	res.ColumnValues = columnValues
 	return res, nil
 }
 

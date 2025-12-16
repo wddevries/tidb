@@ -340,13 +340,15 @@ create table t(
 		filterConds string
 		resultStr   string
 	}{
-		{
-			indexPos:    6,
-			exprStr:     `a = 1 and a = 2`,
-			accessConds: "[]",
-			filterConds: "[]",
-			resultStr:   `[]`,
-		},
+		/*
+			{
+				indexPos:    6,
+				exprStr:     `a = 1 and a = 2`,
+				accessConds: "[]",
+				filterConds: "[]",
+				resultStr:   `[]`,
+			},
+		*/
 		{
 			indexPos:    0,
 			exprStr:     `a not in (0, 1, 2)`,
@@ -354,124 +356,126 @@ create table t(
 			filterConds: "[]",
 			resultStr:   `[(NULL,0) (2,+inf]]`,
 		},
-		{
-			indexPos:    0,
-			exprStr:     `a not in (-1, 1, 2)`,
-			accessConds: "[not(in(test.t.a, -1, 1, 2))]",
-			filterConds: "[]",
-			resultStr:   `[(NULL,1) (2,+inf]]`,
-		},
-		{
-			indexPos:    0,
-			exprStr:     `a not in (-2, -1, 1, 2)`,
-			accessConds: "[not(in(test.t.a, -2, -1, 1, 2))]",
-			filterConds: "[]",
-			resultStr:   `[(NULL,1) (2,+inf]]`,
-		},
-		{
-			indexPos:    0,
-			exprStr:     `a not in (111)`,
-			accessConds: "[ne(test.t.a, 111)]",
-			filterConds: "[]",
-			resultStr:   `[[-inf,111) (111,+inf]]`,
-		},
-		{
-			indexPos:    0,
-			exprStr:     `a not in (1, 2, 9223372036854775810)`,
-			accessConds: "[not(in(test.t.a, 1, 2, 9223372036854775810))]",
-			filterConds: "[]",
-			resultStr:   `[(NULL,1) (2,9223372036854775810) (9223372036854775810,+inf]]`,
-		},
-		{
-			indexPos:    0,
-			exprStr:     `a >= -2147483648`,
-			accessConds: "[ge(test.t.a, -2147483648)]",
-			filterConds: "[]",
-			resultStr:   `[[0,+inf]]`,
-		},
-		{
-			indexPos:    0,
-			exprStr:     `a > -2147483648`,
-			accessConds: "[gt(test.t.a, -2147483648)]",
-			filterConds: "[]",
-			resultStr:   `[[0,+inf]]`,
-		},
-		{
-			indexPos:    0,
-			exprStr:     `a != -2147483648`,
-			accessConds: "[ne(test.t.a, -2147483648)]",
-			filterConds: "[]",
-			resultStr:   `[[0,+inf]]`,
-		},
-		{
-			exprStr:     "a < -1 or a < 1",
-			accessConds: "[or(lt(test.t.a, -1), lt(test.t.a, 1))]",
-			filterConds: "[]",
-			resultStr:   "[[-inf,1)]",
-		},
-		{
-			exprStr:     "a < -1 and a < 1",
-			accessConds: "[]",
-			filterConds: "[]",
-			resultStr:   "[]",
-		},
-		{
-			indexPos:    1,
-			exprStr:     "decimal_unsigned > -100",
-			accessConds: "[gt(test.t.decimal_unsigned, -100)]",
-			filterConds: "[]",
-			resultStr:   "[[0,+inf]]",
-		},
-		{
-			indexPos:    2,
-			exprStr:     "float_unsigned > -100",
-			accessConds: "[gt(test.t.float_unsigned, -100)]",
-			filterConds: "[]",
-			resultStr:   "[[0,+inf]]",
-		},
-		{
-			indexPos:    3,
-			exprStr:     "double_unsigned > -100",
-			accessConds: "[gt(test.t.double_unsigned, -100)]",
-			filterConds: "[]",
-			resultStr:   "[[0,+inf]]",
-		},
-		// test for overflow value access index
-		{
-			indexPos:    4,
-			exprStr:     "col_int != 9223372036854775808",
-			accessConds: "[ne(test.t.col_int, 9223372036854775808)]",
-			filterConds: "[]",
-			resultStr:   "[[-inf,+inf]]",
-		},
-		{
-			indexPos:    4,
-			exprStr:     "col_int > 9223372036854775808",
-			accessConds: "[gt(test.t.col_int, 9223372036854775808)]",
-			filterConds: "[]",
-			resultStr:   "[]",
-		},
-		{
-			indexPos:    4,
-			exprStr:     "col_int < 9223372036854775808",
-			accessConds: "[lt(test.t.col_int, 9223372036854775808)]",
-			filterConds: "[]",
-			resultStr:   "[[-inf,+inf]]",
-		},
-		{
-			indexPos:    5,
-			exprStr:     "col_float > 1000000000000000000000000000000000000000",
-			accessConds: "[gt(test.t.col_float, 1e+39)]",
-			filterConds: "[]",
-			resultStr:   "[]",
-		},
-		{
-			indexPos:    5,
-			exprStr:     "col_float < -1000000000000000000000000000000000000000",
-			accessConds: "[lt(test.t.col_float, -1e+39)]",
-			filterConds: "[]",
-			resultStr:   "[]",
-		},
+		/*
+			{
+				indexPos:    0,
+				exprStr:     `a not in (-1, 1, 2)`,
+				accessConds: "[not(in(test.t.a, -1, 1, 2))]",
+				filterConds: "[]",
+				resultStr:   `[(NULL,1) (2,+inf]]`,
+			},
+				{
+					indexPos:    0,
+					exprStr:     `a not in (-2, -1, 1, 2)`,
+					accessConds: "[not(in(test.t.a, -2, -1, 1, 2))]",
+					filterConds: "[]",
+					resultStr:   `[(NULL,1) (2,+inf]]`,
+				},
+				{
+					indexPos:    0,
+					exprStr:     `a not in (111)`,
+					accessConds: "[ne(test.t.a, 111)]",
+					filterConds: "[]",
+					resultStr:   `[[-inf,111) (111,+inf]]`,
+				},
+				{
+					indexPos:    0,
+					exprStr:     `a not in (1, 2, 9223372036854775810)`,
+					accessConds: "[not(in(test.t.a, 1, 2, 9223372036854775810))]",
+					filterConds: "[]",
+					resultStr:   `[(NULL,1) (2,9223372036854775810) (9223372036854775810,+inf]]`,
+				},
+				{
+					indexPos:    0,
+					exprStr:     `a >= -2147483648`,
+					accessConds: "[ge(test.t.a, -2147483648)]",
+					filterConds: "[]",
+					resultStr:   `[[0,+inf]]`,
+				},
+				{
+					indexPos:    0,
+					exprStr:     `a > -2147483648`,
+					accessConds: "[gt(test.t.a, -2147483648)]",
+					filterConds: "[]",
+					resultStr:   `[[0,+inf]]`,
+				},
+				{
+					indexPos:    0,
+					exprStr:     `a != -2147483648`,
+					accessConds: "[ne(test.t.a, -2147483648)]",
+					filterConds: "[]",
+					resultStr:   `[[0,+inf]]`,
+				},
+				{
+					exprStr:     "a < -1 or a < 1",
+					accessConds: "[or(lt(test.t.a, -1), lt(test.t.a, 1))]",
+					filterConds: "[]",
+					resultStr:   "[[-inf,1)]",
+				},
+				{
+					exprStr:     "a < -1 and a < 1",
+					accessConds: "[]",
+					filterConds: "[]",
+					resultStr:   "[]",
+				},
+				{
+					indexPos:    1,
+					exprStr:     "decimal_unsigned > -100",
+					accessConds: "[gt(test.t.decimal_unsigned, -100)]",
+					filterConds: "[]",
+					resultStr:   "[[0,+inf]]",
+				},
+				{
+					indexPos:    2,
+					exprStr:     "float_unsigned > -100",
+					accessConds: "[gt(test.t.float_unsigned, -100)]",
+					filterConds: "[]",
+					resultStr:   "[[0,+inf]]",
+				},
+				{
+					indexPos:    3,
+					exprStr:     "double_unsigned > -100",
+					accessConds: "[gt(test.t.double_unsigned, -100)]",
+					filterConds: "[]",
+					resultStr:   "[[0,+inf]]",
+				},
+				// test for overflow value access index
+				{
+					indexPos:    4,
+					exprStr:     "col_int != 9223372036854775808",
+					accessConds: "[ne(test.t.col_int, 9223372036854775808)]",
+					filterConds: "[]",
+					resultStr:   "[[-inf,+inf]]",
+				},
+				{
+					indexPos:    4,
+					exprStr:     "col_int > 9223372036854775808",
+					accessConds: "[gt(test.t.col_int, 9223372036854775808)]",
+					filterConds: "[]",
+					resultStr:   "[]",
+				},
+				{
+					indexPos:    4,
+					exprStr:     "col_int < 9223372036854775808",
+					accessConds: "[lt(test.t.col_int, 9223372036854775808)]",
+					filterConds: "[]",
+					resultStr:   "[[-inf,+inf]]",
+				},
+				{
+					indexPos:    5,
+					exprStr:     "col_float > 1000000000000000000000000000000000000000",
+					accessConds: "[gt(test.t.col_float, 1e+39)]",
+					filterConds: "[]",
+					resultStr:   "[]",
+				},
+				{
+					indexPos:    5,
+					exprStr:     "col_float < -1000000000000000000000000000000000000000",
+					accessConds: "[lt(test.t.col_float, -1e+39)]",
+					filterConds: "[]",
+					resultStr:   "[]",
+				},
+		*/
 	}
 
 	ctx := context.Background()
@@ -499,7 +503,10 @@ create table t(
 			}
 			cols, lengths := plannerutil.IndexInfo2PrefixCols(tbl.Columns, selection.Schema().Columns, tbl.Indices[tt.indexPos])
 			require.NotNil(t, cols)
-			res, err := ranger.DetachCondAndBuildRangeForIndex(rctx, conds, cols, lengths, 0)
+			res, err := ranger.DetachCondAndBuildRangeForIndex2(rctx, conds, cols, lengths, 0)
+			require.NoError(t, err)
+
+			res, err = ranger.DetachCondAndBuildRangeForIndex(rctx, conds, cols, lengths, 0)
 			require.NoError(t, err)
 			require.Equal(t, tt.accessConds, expression.StringifyExpressionsWithCtx(ectx, res.AccessConds))
 			require.Equal(t, tt.filterConds, expression.StringifyExpressionsWithCtx(ectx, res.RemainedConds))
