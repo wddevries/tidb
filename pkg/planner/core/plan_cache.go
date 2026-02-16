@@ -194,15 +194,12 @@ func GetPlanFromPlanCache(ctx context.Context, sctx sessionctx.Context,
 
 	sessVars := sctx.GetSessionVars()
 	stmtCtx := sessVars.StmtCtx
-	cacheEnabled := false
 	if isNonPrepared {
 		stmtCtx.SetCacheType(contextutil.SessionNonPrepared)
-		cacheEnabled = sessVars.EnableNonPreparedPlanCache // plan-cache might be disabled after prepare.
 	} else {
 		stmtCtx.SetCacheType(contextutil.SessionPrepared)
-		cacheEnabled = sessVars.EnablePreparedPlanCache
 	}
-	if stmt.StmtCacheable && cacheEnabled {
+	if stmt.StmtCacheable {
 		stmtCtx.EnablePlanCache()
 	}
 	if stmt.UncacheableReason != "" {

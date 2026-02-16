@@ -14,6 +14,17 @@ execute st using @a, @b;
 set session tidb_enable_non_prepared_plan_cache=DEFAULT;
 
 
+# TestExplainExecute
+drop table if exists t;
+create table t (a int, b int, key(a));
+prepare stmt from 'select * from t where a = ?';
+set @x = 1;
+explain execute stmt using @x;
+execute stmt using @x;
+explain format=brief execute stmt using @x;
+deallocate prepare stmt;
+
+
 # TestIssue44830
 set @@tidb_opt_fix_control = "44830:ON";
 drop table if exists t, t1;

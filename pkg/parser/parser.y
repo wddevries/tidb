@@ -7266,7 +7266,6 @@ UnReservedKeyword:
 |	"ERRORS"
 |	"ESCAPE"
 |	"EVOLVE"
-|	"EXECUTE"
 |	"EXPLORE"
 |	"EXTENDED"
 |	"FIELDS"
@@ -12973,6 +12972,7 @@ ExplainableStmt:
 	}
 |	AlterTableStmt
 |	ImportIntoStmt
+|	ExecuteStmt
 
 StatementList:
 	Statement

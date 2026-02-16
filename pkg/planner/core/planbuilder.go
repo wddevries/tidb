@@ -5867,6 +5867,10 @@ func (b *PlanBuilder) buildExplain(ctx context.Context, explain *ast.ExplainStmt
 		if err != nil {
 			return nil, err
 		}
+		// For EXPLAIN EXECUTE, show the inner plan that would be executed, not the Execute wrapper.
+		if execPlan, ok := targetPlan.(*Execute); ok && execPlan.Plan != nil {
+			targetPlan = execPlan.Plan
+		}
 	}
 
 	return b.buildExplainPlan(targetPlan, explain.Format, "", explain.Analyze, explain.Explore, explain.Stmt, nil, explain.SQLDigest)

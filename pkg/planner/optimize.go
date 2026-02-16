@@ -178,16 +178,16 @@ func Optimize(ctx context.Context, sctx sessionctx.Context, node *resolve.NodeW,
 		}
 	}()
 
-	// Handle the execute statement.  This calls into the prepared plan cache.
-	if _, ok := node.Node.(*ast.ExecuteStmt); ok {
-		p, names, err := OptimizeExecStmt(ctx, sctx, node, is)
-		return p, names, err
-	}
-
 	return optimizeCache(ctx, sctx, node, is)
 }
 
 func optimizeCache(ctx context.Context, sctx sessionctx.Context, node *resolve.NodeW, is infoschema.InfoSchema) (plan base.Plan, slice types.NameSlice, retErr error) {
+	// Handle the execute statement.  This calls into the prepared plan cache.
+	if _, ok := node.Node.(*ast.ExecuteStmt); ok {
+		p, names, err := OptimizeExecStmt(ctx, sctx, node, is, true)
+		return p, names, err
+	}
+
 	// Call into the non-prepared plan cache.
 	cachedPlan, names, ok, err := getPlanFromNonPreparedPlanCache(ctx, sctx, node, is)
 	if err != nil {
@@ -201,6 +201,11 @@ func optimizeCache(ctx context.Context, sctx sessionctx.Context, node *resolve.N
 }
 
 func optimizeNoCache(ctx context.Context, sctx sessionctx.Context, node *resolve.NodeW, is infoschema.InfoSchema) (plan base.Plan, slice types.NameSlice, retErr error) {
+	if _, ok := node.Node.(*ast.ExecuteStmt); ok {
+		// ExecuteStmt must go through OptimizeExecStmt so exec.Plan is populated from the plan cache.
+		return OptimizeExecStmt(ctx, sctx, node, is, false)
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			retErr = tidbutil.GetRecoverError(r)
@@ -508,11 +513,13 @@ func optimize(ctx context.Context, sctx planctx.PlanContext, node *resolve.NodeW
 
 // OptimizeExecStmt to handle the "execute" statement
 func OptimizeExecStmt(ctx context.Context, sctx sessionctx.Context,
-	execAst *resolve.NodeW, is infoschema.InfoSchema) (base.Plan, types.NameSlice, error) {
+	execAst *resolve.NodeW, is infoschema.InfoSchema, useCache bool) (base.Plan, types.NameSlice, error) {
 	builder := planBuilderPool.Get().(*core.PlanBuilder)
 	defer planBuilderPool.Put(builder.ResetForReuse())
 	pctx := sctx.GetPlanCtx()
 	builder.Init(pctx, is, nil)
+	sessVars := sctx.GetSessionVars()
+	//	stmtCtx := sessVars.StmtCtx
 
 	p, err := buildLogicalPlan(ctx, pctx, execAst, builder)
 	if err != nil {
@@ -522,9 +529,19 @@ func OptimizeExecStmt(ctx context.Context, sctx sessionctx.Context,
 	if !ok {
 		return nil, nil, errors.Errorf("invalid result plan type, should be Execute")
 	}
-	plan, names, err := core.GetPlanFromPlanCache(ctx, sctx, false, is, exec.PrepStmt, exec.Params)
-	if err != nil {
-		return nil, nil, err
+	var plan base.Plan
+	var names []*types.FieldName
+	if useCache && sessVars.EnablePreparedPlanCache {
+		plan, names, err = core.GetPlanFromPlanCache(ctx, sctx, false, is, exec.PrepStmt, exec.Params)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		nodeW := resolve.NewNodeWWithCtx(exec.PrepStmt.PreparedAst.Stmt, exec.PrepStmt.ResolveCtx)
+		plan, names, err = optimizeNoCache(ctx, sctx, nodeW, is)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	exec.Plan = plan
 	exec.SetOutputNames(names)

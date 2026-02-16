@@ -16,6 +16,21 @@ id	value	c1	c2
 execute st using @a, @b;
 id	value	c1	c2
 set session tidb_enable_non_prepared_plan_cache=DEFAULT;
+drop table if exists t;
+create table t (a int, b int, key(a));
+prepare stmt from 'select * from t where a = ?';
+set @x = 1;
+explain execute stmt using @x;
+id	estRows	task	access object	operator info
+TableDual_7	0.00	root		rows:0
+execute stmt using @x;
+a	b
+explain format=brief execute stmt using @x;
+id	estRows	task	access object	operator info
+IndexLookUp	10.00	root		
+├─IndexRangeScan(Build)	10.00	cop[tikv]	table:t, index:a(a)	range:[1,1], keep order:false, stats:pseudo
+└─TableRowIDScan(Probe)	10.00	cop[tikv]	table:t	keep order:false, stats:pseudo
+deallocate prepare stmt;
 set @@tidb_opt_fix_control = "44830:ON";
 drop table if exists t, t1;
 create table t (a int, primary key(a));
