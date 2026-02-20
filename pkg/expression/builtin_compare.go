@@ -1879,20 +1879,14 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 	}
 
 	// int constant [cmp] year type
-	if arg0IsCon && arg0IsInt && arg1Type.GetType() == mysql.TypeYear && !arg0.Value.IsNull() {
-		adjusted, failed := types.AdjustYear(arg0.Value.GetInt64(), false)
-		if failed == nil {
-			arg0.Value.SetInt64(adjusted)
-			finalArg0 = arg0
-		}
+	if arg0IsCon && arg0IsInt && arg1Type.GetType() == mysql.TypeYear {
+		finalArg0 = WrapWithCastAsYear(ctx, args[0])
+		return []Expression{finalArg0, finalArg1}, nil
 	}
 	// year type [cmp] int constant
-	if arg1IsCon && arg1IsInt && arg0Type.GetType() == mysql.TypeYear && !arg1.Value.IsNull() {
-		adjusted, failed := types.AdjustYear(arg1.Value.GetInt64(), false)
-		if failed == nil {
-			arg1.Value.SetInt64(adjusted)
-			finalArg1 = arg1
-		}
+	if arg1IsCon && arg1IsInt && arg0Type.GetType() == mysql.TypeYear {
+		finalArg1 = WrapWithCastAsYear(ctx, args[1])
+		return []Expression{finalArg0, finalArg1}, nil
 	}
 
 	return c.refineArgsByUnsignedFlag(ctx, []Expression{finalArg0, finalArg1}), nil

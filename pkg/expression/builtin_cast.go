@@ -998,6 +998,9 @@ func (b *builtinCastIntAsIntSig) evalInt(ctx EvalContext, row chunk.Row) (res in
 	if b.inUnion && mysql.HasUnsignedFlag(b.tp.GetFlag()) && res < 0 {
 		res = 0
 	}
+	if b.tp.GetType() == mysql.TypeYear {
+		res, err = types.AdjustYear(res, false)
+	}
 	return
 }
 
@@ -2885,6 +2888,17 @@ func WrapWithCastAsVectorFloat32(ctx BuildContext, expr Expression) Expression {
 		return expr
 	}
 	tp := types.NewFieldType(mysql.TypeTiDBVectorFloat32)
+	return BuildCastFunction(ctx, expr, tp)
+}
+
+// WrapWithCastAsYear wraps `expr` with `cast` if the return type of expr is not
+// type year, otherwise, returns `expr` directly.
+func WrapWithCastAsYear(ctx BuildContext, expr Expression) Expression {
+	if expr.GetType(ctx.GetEvalCtx()).GetType() == mysql.TypeYear {
+		return expr
+	}
+	tp := types.NewFieldType(mysql.TypeYear)
+	types.SetBinChsClnFlag(tp)
 	return BuildCastFunction(ctx, expr, tp)
 }
 
