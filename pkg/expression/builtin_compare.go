@@ -1766,6 +1766,68 @@ func allowCmpArgsRefining4PlanCache(ctx BuildContext, args []Expression) (allowR
 	return false
 }
 
+func (c *compareFunctionClass) refineIntNonConstToNonIntConst(ctx BuildContext, finalArgType0 *types.FieldType, finalArg0 Expression, finalArg1 *Constant, op opcode.Op, swap bool) ([]Expression, error) {
+	isPositiveInfinite := false
+	isNegativeInfinite := false
+
+	op2 := op
+	if swap {
+		op2 = symmetricOp[op]
+	}
+	con, isExceptional := RefineComparedConstant(ctx, *finalArgType0, finalArg1, op2)
+
+	// Why check not null flag
+	// eg: int_col > const_val(which is less than min_int32)
+	// If int_col got null, compare result cannot be true
+	if !isExceptional || (isExceptional && mysql.HasNotNullFlag(finalArgType0.GetFlag())) {
+		finalArg1 = con
+	}
+	// TODO if the plan doesn't care about whether the result of the function is null or false, we don't need
+	// to check the NotNullFlag, then more optimizations can be enabled.
+	isExceptional = isExceptional && mysql.HasNotNullFlag(finalArgType0.GetFlag())
+	if isExceptional && con.GetType(ctx.GetEvalCtx()).EvalType() == types.ETInt {
+		// Judge it is inf or -inf
+		// For int:
+		//			inf:  01111111 & 1 == 1
+		//		   -inf:  10000000 & 1 == 0
+		// For uint:
+		//			inf:  11111111 & 1 == 1
+		//		   -inf:  00000000 & 1 == 0
+		if con.Value.GetInt64()&1 == 1 {
+			isPositiveInfinite = !swap
+			isNegativeInfinite = swap
+		} else {
+			isPositiveInfinite = swap
+			isNegativeInfinite = !swap
+		}
+	}
+
+	if isExceptional && (op == opcode.EQ || op == opcode.NullEQ) {
+		// This will always be false.
+		return []Expression{NewZero(), NewOne()}, nil
+	}
+	if isPositiveInfinite {
+		// If the op is opcode.LT, opcode.LE
+		// This will always be true.
+		// If the op is opcode.GT, opcode.GE
+		// This will always be false.
+		return []Expression{NewZero(), NewOne()}, nil
+	}
+	if isNegativeInfinite {
+		// If the op is opcode.GT, opcode.GE
+		// This will always be true.
+		// If the op is opcode.LT, opcode.LE
+		// This will always be false.
+		return []Expression{NewOne(), NewZero()}, nil
+	}
+
+	if !swap {
+		return []Expression{finalArg0, finalArg1}, nil
+	} else {
+		return []Expression{finalArg1, finalArg0}, nil
+	}
+}
+
 // refineArgs will rewrite the arguments if the compare expression is
 //  1. `int column <cmp> non-int constant` or `non-int constant <cmp> int column`. E.g., `a < 1.1` will be rewritten to `a < 2`.
 //  2. It also handles comparing year type with int constant if the int constant falls into a sensible year representation.
@@ -1782,8 +1844,7 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 	arg1IsInt := arg1EvalType == types.ETInt
 	arg0, arg0IsCon := args[0].(*Constant)
 	arg1, arg1IsCon := args[1].(*Constant)
-	isExceptional, finalArg0, finalArg1 := false, args[0], args[1]
-	isPositiveInfinite, isNegativeInfinite := false, false
+	finalArg0, finalArg1 := args[0], args[1]
 
 	if !allowCmpArgsRefining4PlanCache(ctx, args) {
 		return args, nil
@@ -1810,47 +1871,11 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 
 	// int non-constant [cmp] non-int constant
 	if arg0IsInt && !arg0IsCon && !arg1IsInt && arg1IsCon {
-		arg1, isExceptional = RefineComparedConstant(ctx, *arg0Type, arg1, c.op)
-		// Why check not null flag
-		// eg: int_col > const_val(which is less than min_int32)
-		// If int_col got null, compare result cannot be true
-		if !isExceptional || (isExceptional && mysql.HasNotNullFlag(arg0Type.GetFlag())) {
-			finalArg1 = arg1
-		}
-		// TODO if the plan doesn't care about whether the result of the function is null or false, we don't need
-		// to check the NotNullFlag, then more optimizations can be enabled.
-		isExceptional = isExceptional && mysql.HasNotNullFlag(arg0Type.GetFlag())
-		if isExceptional && arg1.GetType(ctx.GetEvalCtx()).EvalType() == types.ETInt {
-			// Judge it is inf or -inf
-			// For int:
-			//			inf:  01111111 & 1 == 1
-			//		   -inf:  10000000 & 1 == 0
-			// For uint:
-			//			inf:  11111111 & 1 == 1
-			//		   -inf:  00000000 & 1 == 0
-			if arg1.Value.GetInt64()&1 == 1 {
-				isPositiveInfinite = true
-			} else {
-				isNegativeInfinite = true
-			}
-		}
+		return c.refineIntNonConstToNonIntConst(ctx, arg0Type, finalArg0, arg1, c.op, false)
 	}
 	// non-int constant [cmp] int non-constant
 	if arg1IsInt && !arg1IsCon && !arg0IsInt && arg0IsCon {
-		arg0, isExceptional = RefineComparedConstant(ctx, *arg1Type, arg0, symmetricOp[c.op])
-		if !isExceptional || (isExceptional && mysql.HasNotNullFlag(arg1Type.GetFlag())) {
-			finalArg0 = arg0
-		}
-		// TODO if the plan doesn't care about whether the result of the function is null or false, we don't need
-		// to check the NotNullFlag, then more optimizations can be enabled.
-		isExceptional = isExceptional && mysql.HasNotNullFlag(arg1Type.GetFlag())
-		if isExceptional && arg0.GetType(ctx.GetEvalCtx()).EvalType() == types.ETInt {
-			if arg0.Value.GetInt64()&1 == 1 {
-				isNegativeInfinite = true
-			} else {
-				isPositiveInfinite = true
-			}
-		}
+		return c.refineIntNonConstToNonIntConst(ctx, arg1Type, finalArg1, arg0, c.op, true)
 	}
 
 	// int constant [cmp] year type
@@ -1868,24 +1893,6 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 			arg1.Value.SetInt64(adjusted)
 			finalArg1 = arg1
 		}
-	}
-	if isExceptional && (c.op == opcode.EQ || c.op == opcode.NullEQ) {
-		// This will always be false.
-		return []Expression{NewZero(), NewOne()}, nil
-	}
-	if isPositiveInfinite {
-		// If the op is opcode.LT, opcode.LE
-		// This will always be true.
-		// If the op is opcode.GT, opcode.GE
-		// This will always be false.
-		return []Expression{NewZero(), NewOne()}, nil
-	}
-	if isNegativeInfinite {
-		// If the op is opcode.GT, opcode.GE
-		// This will always be true.
-		// If the op is opcode.LT, opcode.LE
-		// This will always be false.
-		return []Expression{NewOne(), NewZero()}, nil
 	}
 
 	return c.refineArgsByUnsignedFlag(ctx, []Expression{finalArg0, finalArg1}), nil
