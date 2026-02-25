@@ -1618,7 +1618,7 @@ func (d *Datum) convertToMysqlDecimal(ctx Context, target *FieldType) (Datum, er
 	if dec.negative && mysql.HasUnsignedFlag(target.GetFlag()) {
 		*dec = zeroMyDecimal
 		if err == nil {
-			err = ErrOverflow.GenWithStackByArgs("DECIMAL", fmt.Sprintf("(%d, %d)", target.GetFlen(), target.GetDecimal()))
+			err = ErrDataOutOfRange.GenWithStackByArgs("DECIMAL", fmt.Sprintf("(%d, %d)", target.GetFlen(), target.GetDecimal()))
 		}
 	}
 	ret.SetMysqlDecimal(dec)
@@ -1652,7 +1652,7 @@ func ProduceDecWithSpecifiedTp(ctx Context, dec *MyDecimal, tp *FieldType) (_ *M
 			// Integer length is longer, choose the max or min decimal.
 			dec = NewMaxOrMinDec(dec.IsNegative(), flen, decimal)
 			// select cast(111 as decimal(1)) causes a warning in MySQL.
-			err = ErrOverflow.GenWithStackByArgs("DECIMAL", fmt.Sprintf("(%d, %d)", flen, decimal))
+			err = ErrDataOutOfRange.GenWithStackByArgs("DECIMAL", fmt.Sprintf("(%d, %d)", flen, decimal))
 		} else if old != nil && dec.Compare(old) != 0 {
 			ctx.AppendWarning(ErrTruncatedWrongVal.FastGenByArgs("DECIMAL", old))
 		}
@@ -2630,7 +2630,7 @@ func ChangeReverseResultByUpperLowerBound(
 	res Datum,
 	rType RoundingType) (Datum, error) {
 	d, err := res.ConvertTo(ctx, retType)
-	if terror.ErrorEqual(err, ErrOverflow) {
+	if terror.ErrorEqual(err, ErrDataOutOfRange) {
 		return d, nil
 	}
 	if err != nil {

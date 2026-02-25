@@ -168,7 +168,7 @@ func TestTruncateFloat(t *testing.T) {
 		{100.114, 10, 2, 100.11, nil},
 		{100.115, 10, 2, 100.12, nil},
 		{100.1156, 10, 3, 100.116, nil},
-		{100.1156, 3, 1, 99.9, ErrOverflow},
+		{100.1156, 3, 1, 99.9, ErrDataOutOfRange},
 		{1.36, 10, 2, 1.36, nil},
 	}
 

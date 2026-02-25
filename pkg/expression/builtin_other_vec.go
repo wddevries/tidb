@@ -96,7 +96,7 @@ func (b *builtinBitCountSig) vectorized() bool {
 func (b *builtinBitCountSig) vecEvalInt(ctx EvalContext, input *chunk.Chunk, result *chunk.Column) error {
 	n := input.NumRows()
 	if err := b.args[0].VecEvalInt(ctx, input, result); err != nil {
-		if types.ErrOverflow.Equal(err) {
+		if types.ErrDataOutOfRange.Equal(err) {
 			result.ResizeInt64(n, false)
 			i64s := result.Int64s()
 			for i := range n {

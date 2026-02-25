@@ -48,7 +48,7 @@ func (b *builtinCastIntAsDurationSig) vecEvalDuration(ctx EvalContext, input *ch
 		}
 		dur, err := types.NumberToDuration(i64s[i], b.tp.GetDecimal())
 		if err != nil {
-			if types.ErrOverflow.Equal(err) || types.ErrTruncatedWrongVal.Equal(err) {
+			if types.ErrDataOutOfRange.Equal(err) || types.ErrTruncatedWrongVal.Equal(err) {
 				ec := errCtx(ctx)
 				err = ec.HandleError(err)
 			}
@@ -777,7 +777,7 @@ func (b *builtinCastRealAsIntSig) vecEvalInt(ctx EvalContext, input *chunk.Chunk
 			uintVal, err = types.ConvertFloatToUint(tc.Flags(), f64s[i], types.IntegerUnsignedUpperBound(mysql.TypeLonglong), mysql.TypeLonglong)
 			i64s[i] = int64(uintVal)
 		}
-		if types.ErrOverflow.Equal(err) {
+		if types.ErrDataOutOfRange.Equal(err) {
 			ec := errCtx(ctx)
 			err = ec.HandleError(err)
 		}
@@ -812,7 +812,7 @@ func (b *builtinCastTimeAsRealSig) vecEvalReal(ctx EvalContext, input *chunk.Chu
 		}
 		f64, err := times[i].ToNumber().ToFloat64()
 		if err != nil {
-			if types.ErrOverflow.Equal(err) {
+			if types.ErrDataOutOfRange.Equal(err) {
 				ec := errCtx(ctx)
 				err = ec.HandleError(err)
 			}
@@ -916,7 +916,7 @@ func (b *builtinCastRealAsDecimalSig) vecEvalDecimal(ctx EvalContext, input *chu
 		}
 		if !b.inUnion || bufreal[i] >= 0 {
 			if err = resdecimal[i].FromFloat64(bufreal[i]); err != nil {
-				if types.ErrOverflow.Equal(err) {
+				if types.ErrDataOutOfRange.Equal(err) {
 					warnErr := types.ErrTruncatedWrongVal.GenWithStackByArgs("DECIMAL", b.args[0].StringWithCtx(ctx, perrors.RedactLogDisable))
 					err = ec.HandleErrorWithAlias(err, err, warnErr)
 				} else if types.ErrTruncated.Equal(err) {
@@ -1458,7 +1458,7 @@ func (b *builtinCastDecimalAsRealSig) vecEvalReal(ctx EvalContext, input *chunk.
 		}
 		res, err := d[i].ToFloat64()
 		if err != nil {
-			if types.ErrOverflow.Equal(err) {
+			if types.ErrDataOutOfRange.Equal(err) {
 				ec := errCtx(ctx)
 				err = ec.HandleError(err)
 			}
@@ -1851,7 +1851,7 @@ func (b *builtinCastDecimalAsIntSig) vecEvalInt(ctx EvalContext, input *chunk.Ch
 			i64s[i] = int64(uintRes)
 		}
 
-		if types.ErrOverflow.Equal(err) {
+		if types.ErrDataOutOfRange.Equal(err) {
 			ec := errCtx(ctx)
 			warnErr := types.ErrTruncatedWrongVal.GenWithStackByArgs("DECIMAL", d64s[i])
 			err = ec.HandleErrorWithAlias(err, err, warnErr)

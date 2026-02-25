@@ -1007,7 +1007,7 @@ func getNameValuePairs(ctx expression.BuildContext, tbl *model.TableInfo, tblNam
 		}
 		dVal, err := d.ConvertTo(evalCtx.TypeCtx(), &col.FieldType)
 		if err != nil {
-			if terror.ErrorEqual(types.ErrOverflow, err) {
+			if terror.ErrorEqual(types.ErrDataOutOfRange, err) {
 				return append(nvPairs, nameValuePair{colName: colName.Name.Name.L, colFieldType: &col.FieldType, value: d, con: con}), true
 			}
 			// Some scenarios cast to int with error, but we may use this value in point get.

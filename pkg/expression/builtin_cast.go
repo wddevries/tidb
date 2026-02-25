@@ -1160,7 +1160,7 @@ func (b *builtinCastIntAsDurationSig) evalDuration(ctx EvalContext, row chunk.Ro
 	}
 	dur, err := types.NumberToDuration(val, b.tp.GetDecimal())
 	if err != nil {
-		if types.ErrOverflow.Equal(err) || types.ErrTruncatedWrongVal.Equal(err) {
+		if types.ErrDataOutOfRange.Equal(err) || types.ErrTruncatedWrongVal.Equal(err) {
 			ec := errCtx(ctx)
 			err = ec.HandleError(err)
 		}
@@ -1379,7 +1379,7 @@ func (b *builtinCastRealAsIntSig) evalInt(ctx EvalContext, row chunk.Row) (res i
 		uintVal, err = types.ConvertFloatToUint(tc.Flags(), val, types.IntegerUnsignedUpperBound(mysql.TypeLonglong), mysql.TypeLonglong)
 		res = int64(uintVal)
 	}
-	if types.ErrOverflow.Equal(err) {
+	if types.ErrDataOutOfRange.Equal(err) {
 		ec := errCtx(ctx)
 		err = ec.HandleError(err)
 	}
@@ -1408,7 +1408,7 @@ func (b *builtinCastRealAsDecimalSig) evalDecimal(ctx EvalContext, row chunk.Row
 	ec := errCtx(ctx)
 	if !b.inUnion || val >= 0 {
 		err = res.FromFloat64(val)
-		if types.ErrOverflow.Equal(err) {
+		if types.ErrDataOutOfRange.Equal(err) {
 			warnErr := types.ErrTruncatedWrongVal.GenWithStackByArgs("DECIMAL", b.args[0].StringWithCtx(ctx, errors.RedactLogDisable))
 			err = ec.HandleErrorWithAlias(err, err, warnErr)
 		} else if types.ErrTruncated.Equal(err) {
@@ -1586,7 +1586,7 @@ func (b *builtinCastDecimalAsIntSig) evalInt(ctx EvalContext, row chunk.Row) (re
 		res = int64(uintRes)
 	}
 
-	if types.ErrOverflow.Equal(err) {
+	if types.ErrDataOutOfRange.Equal(err) {
 		ec := errCtx(ctx)
 		warnErr := types.ErrTruncatedWrongVal.GenWithStackByArgs("DECIMAL", val)
 		err = ec.HandleErrorWithAlias(err, err, warnErr)
@@ -1766,7 +1766,7 @@ func (*builtinCastStringAsIntSig) handleOverflow(ctx EvalContext, origRes int64,
 	}
 
 	ec := errCtx(ctx)
-	if types.ErrOverflow.Equal(origErr) {
+	if types.ErrDataOutOfRange.Equal(origErr) {
 		if isNegative {
 			res = math.MinInt64
 		} else {

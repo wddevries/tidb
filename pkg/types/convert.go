@@ -280,7 +280,7 @@ func StrToInt(ctx Context, str string, isFuncCast bool) (int64, error) {
 	validPrefix, err := getValidIntPrefix(ctx, str, isFuncCast)
 	iVal, err1 := strconv.ParseInt(validPrefix, 10, 64)
 	if err1 != nil {
-		return iVal, ErrOverflow.GenWithStackByArgs("BIGINT", validPrefix)
+		return iVal, ErrDataOutOfRange.GenWithStackByArgs("BIGINT", validPrefix)
 	}
 	return iVal, errors.Trace(err)
 }
@@ -309,7 +309,7 @@ func StrToUint(ctx Context, str string, isFuncCast bool) (uint64, error) {
 	}
 
 	if hasParseErr {
-		return uVal, ErrOverflow.GenWithStackByArgs("BIGINT UNSIGNED", validPrefix)
+		return uVal, ErrDataOutOfRange.GenWithStackByArgs("BIGINT UNSIGNED", validPrefix)
 	}
 	return uVal, errors.Trace(err)
 }
@@ -359,11 +359,11 @@ func NumberToDuration(number int64, fsp int) (Duration, error) {
 			}
 		}
 		dur := MaxMySQLDuration(fsp)
-		return dur, ErrOverflow.GenWithStackByArgs("Duration", strconv.Itoa(int(number)))
+		return dur, ErrDataOutOfRange.GenWithStackByArgs("Duration", strconv.Itoa(int(number)))
 	} else if number < -TimeMaxValue {
 		dur := MaxMySQLDuration(fsp)
 		dur.Duration = -dur.Duration
-		return dur, ErrOverflow.GenWithStackByArgs("Duration", strconv.Itoa(int(number)))
+		return dur, ErrDataOutOfRange.GenWithStackByArgs("Duration", strconv.Itoa(int(number)))
 	}
 	var neg bool
 	if neg = number < 0; neg {
@@ -506,7 +506,7 @@ func floatStrToIntStr(validFloat string, oriStr string) (intStr string, _ error)
 		} else {
 			intStr = maxUintStr
 		}
-		return intStr, ErrOverflow.GenWithStackByArgs("BIGINT", oriStr)
+		return intStr, ErrDataOutOfRange.GenWithStackByArgs("BIGINT", oriStr)
 	}
 	intCnt += exp
 	if exp >= 0 && (intCnt > 21 || intCnt < 0) {
@@ -519,7 +519,7 @@ func floatStrToIntStr(validFloat string, oriStr string) (intStr string, _ error)
 		} else {
 			intStr = maxUintStr
 		}
-		return intStr, ErrOverflow.GenWithStackByArgs("BIGINT", oriStr)
+		return intStr, ErrDataOutOfRange.GenWithStackByArgs("BIGINT", oriStr)
 	}
 	if intCnt <= 0 {
 		intStr = "0"

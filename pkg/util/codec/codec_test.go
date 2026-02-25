@@ -773,7 +773,7 @@ func TestDecimal(t *testing.T) {
 	require.Truef(t, terror.ErrorEqual(err, types.ErrTruncated), "err %v", err)
 
 	_, err = EncodeDecimal(nil, d, 12, 10)
-	require.Truef(t, terror.ErrorEqual(err, types.ErrOverflow), "err %v", err)
+	require.Truef(t, terror.ErrorEqual(err, types.ErrDataOutOfRange), "err %v", err)
 
 	errCtx := errctx.StrictNoWarningContext.WithErrGroupLevel(errctx.ErrGroupTruncate, errctx.LevelIgnore)
 	decimalDatum := types.NewDatum(d)

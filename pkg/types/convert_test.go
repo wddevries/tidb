@@ -229,10 +229,10 @@ func TestConvertType(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "3.1416", v.(*MyDecimal).String())
 	v, err = Convert("99999", ft)
-	require.Truef(t, terror.ErrorEqual(err, ErrOverflow), "err %v", err)
+	require.Truef(t, terror.ErrorEqual(err, ErrDataOutOfRange), "err %v", err)
 	require.Equal(t, "9999.9999", v.(*MyDecimal).String())
 	v, err = Convert("-10000", ft)
-	require.Truef(t, terror.ErrorEqual(err, ErrOverflow), "err %v", err)
+	require.Truef(t, terror.ErrorEqual(err, ErrDataOutOfRange), "err %v", err)
 	require.Equal(t, "-9999.9999", v.(*MyDecimal).String())
 	v, err = Convert("1,999.00", ft)
 	require.Truef(t, terror.ErrorEqual(err, ErrTruncated), "err %v", err)
@@ -516,7 +516,7 @@ func TestStrToNum(t *testing.T) {
 	testStrToUint(t, "0", 0, true, nil)
 	testStrToUint(t, "", 0, false, nil)
 	testStrToUint(t, "", 0, false, nil)
-	testStrToUint(t, "-1", 0xffffffffffffffff, false, ErrOverflow)
+	testStrToUint(t, "-1", 0xffffffffffffffff, false, ErrDataOutOfRange)
 	testStrToUint(t, "100", 100, true, nil)
 	testStrToUint(t, "+100", 100, true, nil)
 	testStrToUint(t, "65.0", 65, true, nil)
@@ -989,7 +989,7 @@ func TestGetValidFloat(t *testing.T) {
 		msg := fmt.Sprintf("%d: %v, %v", i, tt.origin, tt.expected)
 		str, err := floatStrToIntStr(tt.origin, tt.origin)
 		if tt.overflow {
-			require.True(t, terror.ErrorEqual(err, ErrOverflow), msg)
+			require.True(t, terror.ErrorEqual(err, ErrDataOutOfRange), msg)
 		} else {
 			require.NoError(t, err, msg)
 		}

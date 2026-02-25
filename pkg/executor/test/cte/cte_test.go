@@ -135,7 +135,7 @@ func TestCTEExecError(t *testing.T) {
 			" union all " +
 			"select iter+1, second, result, second+result from cte where iter < 80 )" +
 			"select * from cte")
-		require.True(t, terror.ErrorEqual(err, types.ErrOverflow))
+		require.True(t, terror.ErrorEqual(err, types.ErrDataOutOfRange))
 	}
 }
 

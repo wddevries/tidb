@@ -210,7 +210,7 @@ func (b *builtinAbsIntSig) evalInt(ctx EvalContext, row chunk.Row) (int64, bool,
 		return val, false, nil
 	}
 	if val == math.MinInt64 {
-		return 0, false, types.ErrOverflow.GenWithStackByArgs("BIGINT", fmt.Sprintf("abs(%d)", val))
+		return 0, false, types.ErrDataOutOfRange.GenWithStackByArgs("BIGINT", fmt.Sprintf("abs(%d)", val))
 	}
 	return -val, false, nil
 }
@@ -1220,7 +1220,7 @@ func (b *builtinPowSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool,
 	}
 	power := math.Pow(x, y)
 	if math.IsInf(power, -1) || math.IsInf(power, 1) || math.IsNaN(power) {
-		return 0, false, types.ErrOverflow.GenWithStackByArgs("DOUBLE", fmt.Sprintf("pow(%s, %s)", strconv.FormatFloat(x, 'f', -1, 64), strconv.FormatFloat(y, 'f', -1, 64)))
+		return 0, false, types.ErrDataOutOfRange.GenWithStackByArgs("DOUBLE", fmt.Sprintf("pow(%s, %s)", strconv.FormatFloat(x, 'f', -1, 64), strconv.FormatFloat(y, 'f', -1, 64)))
 	}
 	return power, false, nil
 }
@@ -1344,7 +1344,7 @@ func (b *builtinConvSig) conv(str string, fromBase, toBase int64) (res string, i
 
 	val, err := strconv.ParseUint(str, int(fromBase), 64)
 	if err != nil {
-		return res, false, types.ErrOverflow.GenWithStackByArgs("BIGINT UNSIGNED", str)
+		return res, false, types.ErrDataOutOfRange.GenWithStackByArgs("BIGINT UNSIGNED", str)
 	}
 	if signed {
 		if negative && val > -math.MinInt64 {
@@ -1771,7 +1771,7 @@ func (b *builtinCotSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool,
 			return cot, false, nil
 		}
 	}
-	return 0, false, types.ErrOverflow.GenWithStackByArgs("DOUBLE", fmt.Sprintf("cot(%s)", strconv.FormatFloat(val, 'f', -1, 64)))
+	return 0, false, types.ErrDataOutOfRange.GenWithStackByArgs("DOUBLE", fmt.Sprintf("cot(%s)", strconv.FormatFloat(val, 'f', -1, 64)))
 }
 
 type degreesFunctionClass struct {
@@ -1855,7 +1855,7 @@ func (b *builtinExpSig) evalReal(ctx EvalContext, row chunk.Row) (float64, bool,
 	exp := math.Exp(val)
 	if math.IsInf(exp, 0) || math.IsNaN(exp) {
 		s := fmt.Sprintf("exp(%s)", b.args[0].StringWithCtx(ctx, perrors.RedactLogDisable))
-		return 0, false, types.ErrOverflow.GenWithStackByArgs("DOUBLE", s)
+		return 0, false, types.ErrDataOutOfRange.GenWithStackByArgs("DOUBLE", s)
 	}
 	return exp, false, nil
 }

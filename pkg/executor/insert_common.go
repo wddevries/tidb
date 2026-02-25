@@ -271,7 +271,7 @@ func completeInsertErr(col *model.ColumnInfo, val *types.Datum, rowIdx int, err 
 
 	if types.ErrDataTooLong.Equal(err) {
 		err = resetErrDataTooLong(colName, rowIdx+1, err)
-	} else if types.ErrOverflow.Equal(err) {
+	} else if types.ErrDataOutOfRange.Equal(err) {
 		err = types.ErrWarnDataOutOfRange.FastGenByArgs(colName, rowIdx+1)
 	} else if types.ErrTruncated.Equal(err) {
 		err = types.ErrTruncated.FastGenByArgs(colName, rowIdx+1)
@@ -758,7 +758,7 @@ func completeError(tbl *model.TableInfo, offset int, rowIdx int, err error) erro
 	if expression.ErrInvalidJSONForFuncIndex.Equal(err) {
 		return expression.ErrInvalidJSONForFuncIndex.GenWithStackByArgs(name)
 	}
-	if types.ErrOverflow.Equal(err) {
+	if types.ErrDataOutOfRange.Equal(err) {
 		return expression.ErrDataOutOfRangeFuncIndex.GenWithStackByArgs(name, rowIdx+1)
 	}
 	if types.ErrDataTooLong.Equal(err) {

@@ -214,7 +214,7 @@ func InvOp2(x, y any, o opcode.Op) (any, error) {
 
 // overflow returns an overflowed error.
 func overflow(v any, tp byte) error {
-	return ErrOverflow.GenWithStack("constant %v overflows %s", v, TypeStr(tp))
+	return ErrDataOutOfRange.GenWithStack("constant %v overflows %s", v, TypeStr(tp))
 }
 
 // IsTypeTemporal checks if a type is a temporal type.

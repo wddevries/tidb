@@ -760,5 +760,5 @@ func TestParquetDecimalFromInt64(t *testing.T) {
 	// Test overflow
 	var dec types.MyDecimal
 	raw := bytes.Repeat([]byte{0x7f}, 40)
-	require.ErrorIs(t, types.ErrOverflow, dec.FromParquetArray(raw, 0))
+	require.ErrorIs(t, types.ErrDataOutOfRange, dec.FromParquetArray(raw, 0))
 }

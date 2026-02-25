@@ -27,7 +27,7 @@ func TestError(t *testing.T) {
 		ErrDataTooLong,
 		ErrIllegalValueForType,
 		ErrTruncated,
-		ErrOverflow,
+		ErrDataOutOfRange,
 		ErrDivByZero,
 		ErrTooBigDisplayWidth,
 		ErrTooBigFieldLength,

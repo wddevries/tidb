@@ -657,7 +657,7 @@ func TestProduceDecWithSpecifiedTp(t *testing.T) {
 		dec := NewDecFromStringForTest(tt.dec)
 		newDec, err := ProduceDecWithSpecifiedTp(ctx, dec, tp)
 		if tt.isOverflow {
-			if !ErrOverflow.Equal(err) {
+			if !ErrDataOutOfRange.Equal(err) {
 				assert.FailNow(t, "Error is not overflow", "err: %v before: %v after: %v", err, tt.dec, dec)
 			}
 		} else {

@@ -1544,7 +1544,7 @@ func tryToConvertConstantInt(ctx BuildContext, targetFieldType *types.FieldType,
 
 	dt, err = dt.ConvertTo(evalCtx.TypeCtx(), targetFieldType)
 	if err != nil {
-		if terror.ErrorEqual(err, types.ErrOverflow) {
+		if terror.ErrorEqual(err, types.ErrDataOutOfRange) {
 			return &Constant{
 				Value:        dt,
 				RetType:      targetFieldType,
@@ -1586,7 +1586,7 @@ func RefineComparedConstant(ctx BuildContext, targetFieldType types.FieldType, c
 	newTypeCtx := oriTypeCtx.WithFlags(oriTypeCtx.Flags().WithAllowNegativeToUnsigned(false))
 	intDatum, err = dt.ConvertTo(newTypeCtx, &targetFieldType)
 	if err != nil {
-		if terror.ErrorEqual(err, types.ErrOverflow) {
+		if terror.ErrorEqual(err, types.ErrDataOutOfRange) {
 			return &Constant{
 				Value:        intDatum,
 				RetType:      &targetFieldType,

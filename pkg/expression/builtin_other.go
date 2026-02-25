@@ -1890,7 +1890,7 @@ func (b *builtinBitCountSig) Clone() builtinFunc {
 func (b *builtinBitCountSig) evalInt(ctx EvalContext, row chunk.Row) (int64, bool, error) {
 	n, isNull, err := b.args[0].EvalInt(ctx, row)
 	if err != nil || isNull {
-		if err != nil && types.ErrOverflow.Equal(err) {
+		if err != nil && types.ErrDataOutOfRange.Equal(err) {
 			return 64, false, nil
 		}
 		return 0, true, err

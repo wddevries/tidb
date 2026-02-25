@@ -402,7 +402,7 @@ func (b *builtinRandomBytesSig) vecEvalString(ctx EvalContext, input *chunk.Chun
 		}
 		byteLen := i64s[i]
 		if byteLen < 1 || byteLen > 1024 {
-			return types.ErrOverflow.GenWithStackByArgs("length", "random_bytes")
+			return types.ErrDataOutOfRange.GenWithStackByArgs("length", "random_bytes")
 		}
 		if n, err := io.CopyN(&dst, rand.Reader, byteLen); err != nil {
 			return err

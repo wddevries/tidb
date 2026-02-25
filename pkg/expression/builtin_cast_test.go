@@ -217,7 +217,7 @@ func TestCastFunctions(t *testing.T) {
 
 	warnings = sc.GetWarnings()
 	lastWarn = warnings[len(warnings)-1]
-	require.Truef(t, terror.ErrorEqual(types.ErrOverflow, lastWarn.Err), "err %v", lastWarn.Err)
+	require.Truef(t, terror.ErrorEqual(types.ErrDataOutOfRange, lastWarn.Err), "err %v", lastWarn.Err)
 	sc = origSc
 
 	// create table tt(a bigint unsigned);

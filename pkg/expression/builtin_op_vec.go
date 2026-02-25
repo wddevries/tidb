@@ -554,7 +554,7 @@ func (b *builtinUnaryMinusIntSig) vecEvalInt(ctx EvalContext, input *chunk.Chunk
 				continue
 			}
 			if uint64(args[i]) > uint64(-math.MinInt64) {
-				return types.ErrOverflow.GenWithStackByArgs("BIGINT", fmt.Sprintf("-%v", uint64(args[i])))
+				return types.ErrDataOutOfRange.GenWithStackByArgs("BIGINT", fmt.Sprintf("-%v", uint64(args[i])))
 			}
 			args[i] = -args[i]
 		}
@@ -564,7 +564,7 @@ func (b *builtinUnaryMinusIntSig) vecEvalInt(ctx EvalContext, input *chunk.Chunk
 				continue
 			}
 			if args[i] == math.MinInt64 {
-				return types.ErrOverflow.GenWithStackByArgs("BIGINT", fmt.Sprintf("-%v", args[i]))
+				return types.ErrDataOutOfRange.GenWithStackByArgs("BIGINT", fmt.Sprintf("-%v", args[i]))
 			}
 			args[i] = -args[i]
 		}

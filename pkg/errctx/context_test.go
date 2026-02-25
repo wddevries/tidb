@@ -32,7 +32,7 @@ func TestContext(t *testing.T) {
 		warn = err
 	}))
 
-	testInternalErr := types.ErrOverflow
+	testInternalErr := types.ErrDataOutOfRange
 	testErr := errors.New("error")
 	testWarn := errors.New("warn")
 	// by default, all errors will be returned directly

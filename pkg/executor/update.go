@@ -478,7 +478,7 @@ func handleUpdateError(sctx sessionctx.Context, colName ast.CIStr, colInfo *mmod
 		return errors.AddStack(resetErrDataTooLong(colName.O, rowIdx+1, err))
 	}
 
-	if types.ErrOverflow.Equal(err) {
+	if types.ErrDataOutOfRange.Equal(err) {
 		return types.ErrWarnDataOutOfRange.GenWithStackByArgs(colName.O, rowIdx+1)
 	}
 

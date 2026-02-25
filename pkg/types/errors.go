@@ -37,8 +37,8 @@ var (
 	ErrIllegalValueForType = dbterror.ClassTypes.NewStd(mysql.ErrIllegalValueForType)
 	// ErrTruncated is returned when data has been truncated during conversion.
 	ErrTruncated = dbterror.ClassTypes.NewStd(mysql.WarnDataTruncated)
-	// ErrOverflow is returned when data is out of range for a field type.
-	ErrOverflow = dbterror.ClassTypes.NewStd(mysql.ErrDataOutOfRange)
+	// ErrDataOutOfRange is returned when data is out of range for a field type.
+	ErrDataOutOfRange = dbterror.ClassTypes.NewStd(mysql.ErrDataOutOfRange)
 	// ErrDivByZero is return when do division by 0.
 	ErrDivByZero = dbterror.ClassTypes.NewStd(mysql.ErrDivisionByZero)
 	// ErrTooBigDisplayWidth is return when display width out of range for column.

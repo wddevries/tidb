@@ -562,7 +562,7 @@ func (b *builtinRandomBytesSig) evalString(ctx EvalContext, row chunk.Row) (stri
 		return "", true, err
 	}
 	if val < 1 || val > 1024 {
-		return "", false, types.ErrOverflow.GenWithStackByArgs("length", "random_bytes")
+		return "", false, types.ErrDataOutOfRange.GenWithStackByArgs("length", "random_bytes")
 	}
 	buf := make([]byte, val)
 	//nolint: gosec

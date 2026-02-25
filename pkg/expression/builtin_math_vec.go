@@ -251,7 +251,7 @@ func (b *builtinCotSig) vecEvalReal(ctx EvalContext, input *chunk.Chunk, result 
 			}
 			continue
 		}
-		if err := types.ErrOverflow.GenWithStackByArgs("DOUBLE", fmt.Sprintf("cot(%s)", strconv.FormatFloat(f64s[i], 'f', -1, 64))); err != nil {
+		if err := types.ErrDataOutOfRange.GenWithStackByArgs("DOUBLE", fmt.Sprintf("cot(%s)", strconv.FormatFloat(f64s[i], 'f', -1, 64))); err != nil {
 			return err
 		}
 	}
@@ -292,7 +292,7 @@ func (b *builtinExpSig) vecEvalReal(ctx EvalContext, input *chunk.Chunk, result 
 		exp := math.Exp(f64s[i])
 		if math.IsInf(exp, 0) || math.IsNaN(exp) {
 			s := fmt.Sprintf("exp(%s)", b.args[0].StringWithCtx(ctx, errors.RedactLogDisable))
-			if err := types.ErrOverflow.GenWithStackByArgs("DOUBLE", s); err != nil {
+			if err := types.ErrDataOutOfRange.GenWithStackByArgs("DOUBLE", s); err != nil {
 				return err
 			}
 		}
@@ -431,7 +431,7 @@ func (b *builtinPowSig) vecEvalReal(ctx EvalContext, input *chunk.Chunk, result 
 		}
 		power := math.Pow(x[i], y[i])
 		if math.IsInf(power, -1) || math.IsInf(power, 1) || math.IsNaN(power) {
-			return types.ErrOverflow.GenWithStackByArgs("DOUBLE", fmt.Sprintf("pow(%s, %s)", strconv.FormatFloat(x[i], 'f', -1, 64), strconv.FormatFloat(y[i], 'f', -1, 64)))
+			return types.ErrDataOutOfRange.GenWithStackByArgs("DOUBLE", fmt.Sprintf("pow(%s, %s)", strconv.FormatFloat(x[i], 'f', -1, 64), strconv.FormatFloat(y[i], 'f', -1, 64)))
 		}
 		f64s[i] = power
 	}
@@ -616,7 +616,7 @@ func (b *builtinAbsIntSig) vecEvalInt(ctx EvalContext, input *chunk.Chunk, resul
 			continue
 		}
 		if i64s[i] == math.MinInt64 {
-			return types.ErrOverflow.GenWithStackByArgs("BIGINT", fmt.Sprintf("abs(%d)", i64s[i]))
+			return types.ErrDataOutOfRange.GenWithStackByArgs("BIGINT", fmt.Sprintf("abs(%d)", i64s[i]))
 		}
 		if i64s[i] < 0 {
 			i64s[i] = -i64s[i]

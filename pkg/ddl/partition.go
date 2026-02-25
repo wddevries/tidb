@@ -1679,7 +1679,7 @@ func checkPartitionValuesIsInt(ctx expression.BuildContext, defName any, exprs [
 
 		evalCtx := ctx.GetEvalCtx()
 		_, err = val.ConvertTo(evalCtx.TypeCtx(), tp)
-		if err != nil && !types.ErrOverflow.Equal(err) {
+		if err != nil && !types.ErrDataOutOfRange.Equal(err) {
 			return dbterror.ErrWrongTypeColumnValue.GenWithStackByArgs()
 		}
 	}
