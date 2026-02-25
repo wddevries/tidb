@@ -101,4 +101,10 @@ var (
 	// ErrTimestampInDSTTransition is returned if the converted timestamp is in the Daylight Saving Time
 	// transition when time leaps forward (normally skips one hour).
 	ErrTimestampInDSTTransition = dbterror.ClassExecutor.NewStd(mysql.ErrTimeStampInDSTTransition)
+
+	// ErrDataOutOfRange is returned when data is out of range for a field type.
+	ErrDataOverflow = dbterror.ClassTypes.NewStd(mysql.ErrDataOverflow)
+
+	// ErrDataOutOfRange is returned when data is out of range for a field type.
+	ErrDataUnderflow = dbterror.ClassTypes.NewStd(mysql.ErrDataUnderflow)
 )

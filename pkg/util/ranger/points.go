@@ -350,10 +350,36 @@ func (r *builder) buildFromBinOp(
 	if col, ok = expr.GetArgs()[0].(*expression.Column); ok {
 		ft = col.RetType
 		value, err = expr.GetArgs()[1].Eval(r.sctx.ExprCtx.GetEvalCtx(), chunk.Row{})
+		op = expr.FuncName.L
 		if err != nil {
+			if errors.ErrorEqual(err, types.ErrDataOverflow) {
+				// Constant is above column max: col=const impossible, col<const/col<=const always true, col>const/col>=const impossible.
+				switch op {
+				case ast.EQ, ast.NullEQ:
+					return nil
+				case ast.NE:
+					return getNotNullFullRange()
+				case ast.LT, ast.LE:
+					return getFullRange()
+				case ast.GT, ast.GE:
+					return nil
+				}
+			}
+			if errors.ErrorEqual(err, types.ErrDataUnderflow) {
+				// Constant is below column min: col=const impossible, col>const/col>=const always true, col<const/col<=const impossible.
+				switch op {
+				case ast.EQ, ast.NullEQ:
+					return nil
+				case ast.NE:
+					return getNotNullFullRange()
+				case ast.LT, ast.LE:
+					return nil
+				case ast.GT, ast.GE:
+					return getFullRange()
+				}
+			}
 			return nil
 		}
-		op = expr.FuncName.L
 	} else {
 		col, ok = expr.GetArgs()[1].(*expression.Column)
 		if !ok {
@@ -361,9 +387,6 @@ func (r *builder) buildFromBinOp(
 		}
 		ft = col.RetType
 		value, err = expr.GetArgs()[0].Eval(r.sctx.ExprCtx.GetEvalCtx(), chunk.Row{})
-		if err != nil {
-			return nil
-		}
 		switch expr.FuncName.L {
 		case ast.GE:
 			op = ast.LE
@@ -375,6 +398,33 @@ func (r *builder) buildFromBinOp(
 			op = ast.GE
 		default:
 			op = expr.FuncName.L
+		}
+		if err != nil {
+			if errors.ErrorEqual(err, types.ErrDataOverflow) {
+				switch op {
+				case ast.EQ, ast.NullEQ:
+					return nil
+				case ast.NE:
+					return getNotNullFullRange()
+				case ast.LT, ast.LE:
+					return getFullRange()
+				case ast.GT, ast.GE:
+					return nil
+				}
+			}
+			if errors.ErrorEqual(err, types.ErrDataUnderflow) {
+				switch op {
+				case ast.EQ, ast.NullEQ:
+					return nil
+				case ast.NE:
+					return getNotNullFullRange()
+				case ast.LT, ast.LE:
+					return nil
+				case ast.GT, ast.GE:
+					return getFullRange()
+				}
+			}
+			return nil
 		}
 	}
 	if op != ast.NullEQ && value.IsNull() {

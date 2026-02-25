@@ -21,8 +21,10 @@ import (
 	"github.com/pingcap/errors"
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/tidb/pkg/kv"
+	"github.com/pingcap/tidb/pkg/parser/ast"
 	"github.com/pingcap/tidb/pkg/parser/mysql"
-	ast "github.com/pingcap/tidb/pkg/parser/types"
+	"github.com/pingcap/tidb/pkg/parser/terror"
+	asttypes "github.com/pingcap/tidb/pkg/parser/types"
 	"github.com/pingcap/tidb/pkg/types"
 	"github.com/pingcap/tidb/pkg/util/chunk"
 	"github.com/pingcap/tidb/pkg/util/codec"
@@ -98,7 +100,7 @@ func (pc PbConverter) ExprToPB(expr Expression) *tipb.Expr {
 func (pc PbConverter) conOrCorColToPBExpr(expr Expression) *tipb.Expr {
 	ft := expr.GetType(pc.ctx)
 	d, err := expr.Eval(pc.ctx, chunk.Row{})
-	if err != nil {
+	if err != nil { // XXX check error type here? instead of deferedExpression?
 		logutil.BgLogger().Error("eval constant or correlated column", zap.String("expression", expr.ExplainInfo(pc.ctx)), zap.Error(err))
 		return nil
 	}
@@ -219,7 +221,7 @@ func (pc PbConverter) columnToPBExpr(column *Column, checkType bool) *tipb.Expr 
 	if checkType {
 		switch column.GetType(pc.ctx).GetType() {
 		case mysql.TypeBit:
-			if !IsPushDownEnabled(ast.TypeStr(mysql.TypeBit), kv.TiKV) {
+			if !IsPushDownEnabled(asttypes.TypeStr(mysql.TypeBit), kv.TiKV) {
 				return nil
 			}
 		case mysql.TypeSet, mysql.TypeGeometry, mysql.TypeUnspecified:
@@ -249,6 +251,36 @@ func (pc PbConverter) columnToPBExpr(column *Column, checkType bool) *tipb.Expr 
 		Val: codec.EncodeInt(nil, id)}
 }
 
+// literalFalsePB returns a tipb.Expr that evaluates to 0 (false) for use as
+// a pushed predicate when a Constant with DeferredExpr overflows.
+func literalFalsePB() *tipb.Expr {
+	ft := types.NewFieldType(mysql.TypeLonglong)
+	return &tipb.Expr{
+		Tp:        tipb.ExprType_Int64,
+		Val:       codec.EncodeInt(nil, 0),
+		FieldType: ToPBFieldType(ft),
+	}
+}
+
+// literalTruePB returns a tipb.Expr that evaluates to 1 (true) for use as
+// a pushed predicate when a Constant with DeferredExpr overflows.
+func literalTruePB() *tipb.Expr {
+	ft := types.NewFieldType(mysql.TypeLonglong)
+	return &tipb.Expr{
+		Tp:        tipb.ExprType_Int64,
+		Val:       codec.EncodeInt(nil, 1),
+		FieldType: ToPBFieldType(ft),
+	}
+}
+
+func constantDeferredExprOverflows(ctx EvalContext, c *Constant) bool {
+	if c.DeferredExpr == nil {
+		return false
+	}
+	_, err := c.Eval(ctx, chunk.Row{})
+	return err != nil && (terror.ErrorEqual(err, types.ErrDataOverflow) || terror.ErrorEqual(err, types.ErrDataUnderflow))
+}
+
 func (pc PbConverter) scalarFuncToPBExpr(expr *ScalarFunction) *tipb.Expr {
 	// Check whether this function has ProtoBuf signature.
 	pbCode := expr.Function.PbCode()
@@ -262,6 +294,85 @@ func (pc PbConverter) scalarFuncToPBExpr(expr *ScalarFunction) *tipb.Expr {
 	// Check whether this function can be pushed.
 	if !canFuncBePushed(pc.ctx, expr, kv.UnSpecified) {
 		return nil
+	}
+
+	// When EQ has a Constant with DeferredExpr (e.g. ForceToInt) that overflows
+	// when evaluated, push a literal false so the selection still pushes below
+	// IndexReader and filters no rows (correct semantics).
+	if len(expr.GetArgs()) == 2 {
+		// only one is constant
+		args := expr.GetArgs()
+		c1, ok1 := args[0].(*Constant)
+		c2, ok2 := args[1].(*Constant)
+		ok1 = ok1 && c1.DeferredExpr != nil
+		ok2 = ok2 && c2.DeferredExpr != nil
+
+		if ok1 || ok2 {
+			c := c1
+			if ok2 {
+				c = c2
+			}
+			switch expr.FuncName.L {
+			case ast.EQ:
+				if constantDeferredExprOverflows(pc.ctx, c) {
+					return literalFalsePB()
+				}
+			case ast.NE:
+				if constantDeferredExprOverflows(pc.ctx, c) {
+					return literalTruePB()
+				}
+			case ast.LT, ast.LE:
+				if ok1 {
+					_, err := c1.Eval(pc.ctx, chunk.Row{})
+					if err != nil {
+						if terror.ErrorEqual(err, types.ErrDataOverflow) {
+							return literalFalsePB()
+						} else if terror.ErrorEqual(err, types.ErrDataUnderflow) {
+							return literalTruePB()
+						}
+					}
+				}
+				if ok2 {
+					_, err := c2.Eval(pc.ctx, chunk.Row{})
+					if err != nil {
+						if terror.ErrorEqual(err, types.ErrDataOverflow) {
+							return literalTruePB()
+						} else if terror.ErrorEqual(err, types.ErrDataUnderflow) {
+							return literalFalsePB()
+						}
+					}
+				}
+			case ast.GT, ast.GE:
+				if ok1 {
+					_, err := c1.Eval(pc.ctx, chunk.Row{})
+					if err != nil {
+						if terror.ErrorEqual(err, types.ErrDataOverflow) {
+							return literalTruePB()
+						} else if terror.ErrorEqual(err, types.ErrDataUnderflow) {
+							return literalFalsePB()
+						}
+					}
+				}
+				if ok2 {
+					_, err := c2.Eval(pc.ctx, chunk.Row{})
+					if err != nil {
+						if terror.ErrorEqual(err, types.ErrDataOverflow) {
+							return literalFalsePB()
+						} else if terror.ErrorEqual(err, types.ErrDataUnderflow) {
+							return literalTruePB()
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if expr.FuncName.L == ast.EQ && len(expr.GetArgs()) == 2 {
+		for _, arg := range expr.GetArgs() {
+			if c, ok := arg.(*Constant); ok && constantDeferredExprOverflows(pc.ctx, c) {
+				return literalFalsePB()
+			}
+		}
 	}
 
 	// Check whether all of its parameters can be pushed.

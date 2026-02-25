@@ -32,6 +32,7 @@ import (
 	"github.com/pingcap/tidb/pkg/parser/charset"
 	"github.com/pingcap/tidb/pkg/parser/mysql"
 	"github.com/pingcap/tidb/pkg/parser/opcode"
+	"github.com/pingcap/tidb/pkg/parser/terror"
 	"github.com/pingcap/tidb/pkg/planner/core/base"
 	"github.com/pingcap/tidb/pkg/planner/core/operator/logicalop"
 	"github.com/pingcap/tidb/pkg/planner/core/operator/physicalop"
@@ -2071,6 +2072,10 @@ func (er *expressionRewriter) inToExpression(lLen int, not bool, tp *types.Field
 	args := er.ctxStack[stkLen-lLen-1:]
 	leftFt := args[0].GetType(er.sctx.GetEvalCtx())
 	leftEt, leftIsNull := leftFt.EvalType(), leftFt.GetType() == mysql.TypeNull
+
+	var args2 []expression.Expression
+	args2 = append(args2, args[0])
+
 	if leftIsNull {
 		er.ctxStackPop(lLen + 1)
 		er.ctxStackAppend(expression.NewNull(), types.EmptyName)
@@ -2078,7 +2083,8 @@ func (er *expressionRewriter) inToExpression(lLen int, not bool, tp *types.Field
 	}
 	if leftEt == types.ETInt {
 		for i := 1; i < len(args); i++ {
-			if c, ok := args[i].(*expression.Constant); ok {
+			arg := args[i]
+			if c, ok := arg.(*expression.Constant); ok {
 				var isExceptional bool
 				if expression.MaybeOverOptimized4PlanCache(er.sctx, c) {
 					if c.GetType(er.sctx.GetEvalCtx()).EvalType() == types.ETInt {
@@ -2086,20 +2092,27 @@ func (er *expressionRewriter) inToExpression(lLen int, not bool, tp *types.Field
 					}
 					er.sctx.SetSkipPlanCache(fmt.Sprintf("'%v' may be converted to INT", c.StringWithCtx(er.sctx.GetEvalCtx(), errors.RedactLogDisable)))
 					if err := expression.RemoveMutableConst(er.sctx, c); err != nil {
-						er.err = err
-						return
+						if terror.ErrorEqual(err, types.ErrDataOverflow) || terror.ErrorEqual(err, types.ErrDataUnderflow) {
+							// If it overflows or underflows an int, then ignore it.
+							continue
+						} else {
+							er.err = err
+							return
+						}
 					}
 				}
-				args[i], isExceptional = expression.RefineComparedConstant(er.sctx, *leftFt, c, opcode.EQ)
+				arg, isExceptional = expression.RefineComparedConstant(er.sctx, *leftFt, c, opcode.EQ)
 				if isExceptional {
-					args[i] = c
+					arg = c
 				}
 			}
+
+			args2 = append(args2, arg)
 		}
 	}
 	allSameType := true
-	for _, arg := range args[1:] {
-		if arg.GetType(er.sctx.GetEvalCtx()).GetType() != mysql.TypeNull && expression.GetAccurateCmpType(er.sctx.GetEvalCtx(), args[0], arg) != leftEt {
+	for _, arg := range args2[1:] {
+		if arg.GetType(er.sctx.GetEvalCtx()).GetType() != mysql.TypeNull && expression.GetAccurateCmpType(er.sctx.GetEvalCtx(), args2[0], arg) != leftEt {
 			allSameType = false
 			break
 		}
@@ -2109,14 +2122,14 @@ func (er *expressionRewriter) inToExpression(lLen int, not bool, tp *types.Field
 		function = er.notToExpression(not, ast.In, tp, er.ctxStack[stkLen-lLen-1:]...)
 	} else {
 		// If we rewrite IN to EQ, we need to decide what's the collation EQ uses.
-		coll := er.deriveCollationForIn(l, lLen, args)
+		coll := er.deriveCollationForIn(l, lLen, args2)
 		if er.err != nil {
 			return
 		}
 		er.castCollationForIn(l, lLen, stkLen, coll)
 		eqFunctions := make([]expression.Expression, 0, lLen)
 		for i := stkLen - lLen; i < stkLen; i++ {
-			expr, err := er.constructBinaryOpFunction(args[0], er.ctxStack[i], ast.EQ)
+			expr, err := er.constructBinaryOpFunction(args2[0], er.ctxStack[i], ast.EQ)
 			if err != nil {
 				er.err = err
 				return

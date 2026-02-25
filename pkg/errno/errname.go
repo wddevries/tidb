@@ -1163,6 +1163,9 @@ var MySQLErrName = map[uint16]*mysql.ErrMessage{
 	ErrResourceGroupInvalidBackgroundTaskName: mysql.Message("Unknown background task name '%-.192s'", nil),
 	ErrQueryExecStopped:                       mysql.Message("Query execution was stopped by the global memory arbitrator [reason=%s] [conn=%d]", nil),
 
+	ErrDataOverflow:  mysql.Message("Data conversion overflowed type.", nil),
+	ErrDataUnderflow: mysql.Message("Data conversion underlowed type.", nil),
+
 	ErrEngineAttributeInvalidFormat:             mysql.Message("Invalid engine attribute format: %s", nil),
 	ErrStorageClassInvalidSpec:                  mysql.Message("Invalid storage class: %s", nil),
 	ErrModifyColumnReferencedByPartialCondition: mysql.Message("Cannot drop, change or modify column '%s': it is referenced in partial index '%s'", nil),

@@ -168,6 +168,13 @@ func canExprPushDown(ctx PushDownContext, expr Expression, storeType kv.StoreTyp
 	case *CorrelatedColumn:
 		return pc.conOrCorColToPBExpr(expr) != nil && pc.columnToPBExpr(&x.Column, true) != nil
 	case *Constant:
+		// When the constant has DeferredExpr (e.g. ForceToInt), treat it as pushable
+		// so the parent (e.g. EQ) can push below IndexReader. At serialize time we
+		// either encode the value or push a literal false when Eval returns ErrDataOverflow.
+		if x.DeferredExpr != nil {
+			// XXX Remove this
+			return true
+		}
 		return pc.conOrCorColToPBExpr(expr) != nil
 	case *Column:
 		return pc.columnToPBExpr(x, true) != nil

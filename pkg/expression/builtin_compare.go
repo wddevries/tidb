@@ -1572,6 +1572,7 @@ func tryToConvertConstantInt(ctx BuildContext, targetFieldType *types.FieldType,
 //	If the op == LT,LE,GT,GE and it gets an Overflow when converting, return inf/-inf.
 //	If the op == EQ,NullEQ and the constant can never be equal to the int column, return ‘con’(the input, a non-int constant).
 func RefineComparedConstant(ctx BuildContext, targetFieldType types.FieldType, con *Constant, op opcode.Op) (_ *Constant, isExceptional bool) {
+	// XXX rewrite with ForceToInt?
 	evalCtx := ctx.GetEvalCtx()
 	dt, err := con.Eval(evalCtx, chunk.Row{})
 	if err != nil {
@@ -1588,10 +1589,11 @@ func RefineComparedConstant(ctx BuildContext, targetFieldType types.FieldType, c
 	if err != nil {
 		if terror.ErrorEqual(err, types.ErrDataOutOfRange) {
 			return &Constant{
-				Value:        intDatum,
-				RetType:      &targetFieldType,
-				DeferredExpr: con.DeferredExpr,
-				ParamMarker:  con.ParamMarker,
+				Value:         intDatum,
+				RetType:       &targetFieldType,
+				DeferredExpr:  con.DeferredExpr,
+				ParamMarker:   con.ParamMarker,
+				SubqueryRefID: con.SubqueryRefID,
 			}, true
 		}
 		return con, false
@@ -1749,7 +1751,7 @@ func allowCmpArgsRefining4PlanCache(ctx BuildContext, args []Expression) (allowR
 		conEvalType := args[conIdx].GetType(ctx.GetEvalCtx()).EvalType()
 		if exprEvalType == types.ETInt &&
 			(conEvalType == types.ETString || conEvalType == types.ETReal || conEvalType == types.ETDecimal) {
-			ctx.SetSkipPlanCache(fmt.Sprintf("'%v' may be converted to INT", args[conIdx].StringWithCtx(ctx.GetEvalCtx(), errors.RedactLogDisable)))
+			//ctx.SetSkipPlanCache(fmt.Sprintf("'%v' may be converted to INT", args[conIdx].StringWithCtx(ctx.GetEvalCtx(), errors.RedactLogDisable)))
 			return true
 		}
 
@@ -1767,58 +1769,50 @@ func allowCmpArgsRefining4PlanCache(ctx BuildContext, args []Expression) (allowR
 }
 
 func (c *compareFunctionClass) refineIntNonConstToNonIntConst(ctx BuildContext, finalArgType0 *types.FieldType, finalArg0 Expression, finalArg1 *Constant, op opcode.Op, swap bool) ([]Expression, error) {
-	isPositiveInfinite := false
-	isNegativeInfinite := false
+	isExceptional := false
 
 	op2 := op
 	if swap {
 		op2 = symmetricOp[op]
 	}
-	con, isExceptional := RefineComparedConstant(ctx, *finalArgType0, finalArg1, op2)
 
-	// Why check not null flag
-	// eg: int_col > const_val(which is less than min_int32)
-	// If int_col got null, compare result cannot be true
-	if !isExceptional || (isExceptional && mysql.HasNotNullFlag(finalArgType0.GetFlag())) {
-		finalArg1 = con
+	var temp Expression
+	var err error
+
+	switch op2 {
+	case opcode.LT, opcode.GE:
+		temp, err = GetForceToIntCeil(ctx, *finalArgType0, finalArg1, op2)
+	case opcode.LE, opcode.GT:
+		temp, err = GetForceToIntFloor(ctx, *finalArgType0, finalArg1, op2)
+	case opcode.NullEQ, opcode.EQ, opcode.NE:
+		temp, err = GetForceToIntEQ(ctx, *finalArgType0, finalArg1, op2)
 	}
-	// TODO if the plan doesn't care about whether the result of the function is null or false, we don't need
-	// to check the NotNullFlag, then more optimizations can be enabled.
-	isExceptional = isExceptional && mysql.HasNotNullFlag(finalArgType0.GetFlag())
-	if isExceptional && con.GetType(ctx.GetEvalCtx()).EvalType() == types.ETInt {
-		// Judge it is inf or -inf
-		// For int:
-		//			inf:  01111111 & 1 == 1
-		//		   -inf:  10000000 & 1 == 0
-		// For uint:
-		//			inf:  11111111 & 1 == 1
-		//		   -inf:  00000000 & 1 == 0
-		if con.Value.GetInt64()&1 == 1 {
-			isPositiveInfinite = !swap
-			isNegativeInfinite = swap
-		} else {
-			isPositiveInfinite = swap
-			isNegativeInfinite = !swap
+
+	evalCtx := ctx.GetEvalCtx()
+	dt, err := temp.Eval(evalCtx, chunk.Row{})
+	if err != nil {
+		//fmt.Println("fudge err: ", err)
+		isExceptional = true
+		//} else {
+		//fmt.Println("fudge no err: ", temp, dt)
+	}
+
+	if !isExceptional { // || (isExceptional && mysql.HasNotNullFlag(finalArgType0.GetFlag())) {
+		finalArg1 = &Constant{
+			Value:        dt,
+			RetType:      finalArgType0,
+			DeferredExpr: temp,
+			//ParamMarker:   nil,
+			SubqueryRefID: finalArg1.SubqueryRefID,
 		}
-	}
-
-	if isExceptional && (op == opcode.EQ || op == opcode.NullEQ) {
-		// This will always be false.
-		return []Expression{NewZero(), NewOne()}, nil
-	}
-	if isPositiveInfinite {
-		// If the op is opcode.LT, opcode.LE
-		// This will always be true.
-		// If the op is opcode.GT, opcode.GE
-		// This will always be false.
-		return []Expression{NewZero(), NewOne()}, nil
-	}
-	if isNegativeInfinite {
-		// If the op is opcode.GT, opcode.GE
-		// This will always be true.
-		// If the op is opcode.LT, opcode.LE
-		// This will always be false.
-		return []Expression{NewOne(), NewZero()}, nil
+	} else if terror.ErrorEqual(err, types.ErrDataOverflow) || terror.ErrorEqual(err, types.ErrDataUnderflow) {
+		// Return a Constant so the comparison has constant args; ranger will Eval, get the error, and adjust points.
+		finalArg1 = &Constant{
+			Value:         dt,
+			RetType:       finalArgType0,
+			DeferredExpr:  temp,
+			SubqueryRefID: finalArg1.SubqueryRefID,
+		}
 	}
 
 	if !swap {
@@ -1849,6 +1843,16 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 	if !allowCmpArgsRefining4PlanCache(ctx, args) {
 		return args, nil
 	}
+
+	// int non-constant [cmp] non-int constant
+	if arg0IsInt && !arg0IsCon && !arg1IsInt && arg1IsCon {
+		return c.refineIntNonConstToNonIntConst(ctx, arg0Type, finalArg0, arg1, c.op, false)
+	}
+	// non-int constant [cmp] int non-constant
+	if arg1IsInt && !arg1IsCon && !arg0IsInt && arg0IsCon {
+		return c.refineIntNonConstToNonIntConst(ctx, arg1Type, finalArg1, arg0, c.op, true)
+	}
+
 	// We should remove the mutable constant for correctness, because its value may be changed.
 	if err := RemoveMutableConst(ctx, args...); err != nil {
 		return nil, err
@@ -1867,15 +1871,6 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 
 	if !arg0IsCon && arg1IsCon && matchRefineRule3Pattern(arg1EvalType, arg0Type) {
 		return c.refineNumericConstantCmpDatetime(ctx, args, arg1, 1), nil
-	}
-
-	// int non-constant [cmp] non-int constant
-	if arg0IsInt && !arg0IsCon && !arg1IsInt && arg1IsCon {
-		return c.refineIntNonConstToNonIntConst(ctx, arg0Type, finalArg0, arg1, c.op, false)
-	}
-	// non-int constant [cmp] int non-constant
-	if arg1IsInt && !arg1IsCon && !arg0IsInt && arg0IsCon {
-		return c.refineIntNonConstToNonIntConst(ctx, arg1Type, finalArg1, arg0, c.op, true)
 	}
 
 	// int constant [cmp] year type
@@ -3391,14 +3386,37 @@ type CompareFunc = func(sctx EvalContext, lhsArg, rhsArg Expression, lhsRow, rhs
 
 // CompareInt compares two integers.
 func CompareInt(sctx EvalContext, lhsArg, rhsArg Expression, lhsRow, rhsRow chunk.Row) (int64, bool, error) {
-	arg0, isNull0, err := lhsArg.EvalInt(sctx, lhsRow)
-	if err != nil {
-		return 0, true, err
+	arg0, isNull0, lhsErr := lhsArg.EvalInt(sctx, lhsRow)
+	lhsOverflow := terror.ErrorEqual(lhsErr, types.ErrDataOverflow)
+	lhsUnderflow := terror.ErrorEqual(lhsErr, types.ErrDataUnderflow)
+	if lhsErr != nil && !lhsOverflow && !lhsUnderflow {
+		return 0, true, lhsErr
 	}
 
-	arg1, isNull1, err := rhsArg.EvalInt(sctx, rhsRow)
-	if err != nil {
-		return 0, true, err
+	arg1, isNull1, rhsErr := rhsArg.EvalInt(sctx, rhsRow)
+	rhsOverflow := terror.ErrorEqual(rhsErr, types.ErrDataOverflow)
+	rhsUnderflow := terror.ErrorEqual(rhsErr, types.ErrDataUnderflow)
+	if rhsErr != nil && !rhsOverflow && !rhsUnderflow {
+		return 0, true, rhsErr
+	}
+
+	//	-1 if x is less than y,
+	//	 0 if x equals y,
+	//	+1 if x is greater than y.
+
+	// This just be before the null checks because
+	// overflowed and underflowed integers are null.
+	if lhsOverflow && !rhsOverflow && !isNull1 {
+		return 1, false, nil
+	}
+	if rhsUnderflow && !lhsUnderflow && !isNull0 {
+		return 1, false, nil
+	}
+	if rhsOverflow && !lhsOverflow && !isNull0 {
+		return -1, false, nil
+	}
+	if lhsUnderflow && !rhsUnderflow && !isNull1 {
+		return -1, false, nil
 	}
 
 	// compare null values.
