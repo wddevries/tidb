@@ -255,13 +255,13 @@ id	audit_id
 3	0
 select @@last_plan_from_cache;
 @@last_plan_from_cache
-0
+1
 execute stmt using @d;
 id	audit_id
 3	0
 select @@last_plan_from_cache;
 @@last_plan_from_cache
-0
+1
 execute stmt using @e;
 id	audit_id
 select @@last_plan_from_cache;
@@ -272,13 +272,13 @@ id	audit_id
 3	0
 select @@last_plan_from_cache;
 @@last_plan_from_cache
-0
+1
 execute stmt using @f;
 id	audit_id
 2	9941971237863476
 select @@last_plan_from_cache;
 @@last_plan_from_cache
-0
+1
 prepare stmt from 'select count(*) from t where audit_id in (?, ?, ?, ?, ?)';
 execute stmt using @a, @b, @c, @d, @e;
 count(*)

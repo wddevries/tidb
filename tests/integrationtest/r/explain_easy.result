@@ -412,7 +412,7 @@ Projection	root		ne(explain_easy.t.a, 123455)->Column
   └─TableFullScan	cop[tikv]	table:t	keep order:false, stats:pseudo
 explain format = 'plan_tree' select t.a = 12345678912345678998789678687678.111 from t;
 id	task	access object	operator info
-Projection	root		0->Column
+Projection	root		eq(explain_easy.t.a, forcetoint(12345678912345678998789678687678.111))->Column
 └─TableReader	root		data:TableFullScan
   └─TableFullScan	cop[tikv]	table:t	keep order:false, stats:pseudo
 drop table if exists t;

@@ -811,19 +811,7 @@ TableReader	root		data:Selection
   └─TableFullScan	cop[tikv]	table:t, partition:p0	keep order:false, stats:pseudo
 explain format='plan_tree' select * from t where a = 1.5;
 id	task	access object	operator info
-PartitionUnion	root		
-├─TableReader	root		data:Selection
-│ └─Selection	cop[tikv]		eq(cast(test_partition.t.a, decimal(10,0) BINARY), 1.5)
-│   └─TableFullScan	cop[tikv]	table:t, partition:p0	keep order:false, stats:pseudo
-├─TableReader	root		data:Selection
-│ └─Selection	cop[tikv]		eq(cast(test_partition.t.a, decimal(10,0) BINARY), 1.5)
-│   └─TableFullScan	cop[tikv]	table:t, partition:p1	keep order:false, stats:pseudo
-├─TableReader	root		data:Selection
-│ └─Selection	cop[tikv]		eq(cast(test_partition.t.a, decimal(10,0) BINARY), 1.5)
-│   └─TableFullScan	cop[tikv]	table:t, partition:p2	keep order:false, stats:pseudo
-└─TableReader	root		data:Selection
-  └─Selection	cop[tikv]		eq(cast(test_partition.t.a, decimal(10,0) BINARY), 1.5)
-    └─TableFullScan	cop[tikv]	table:t, partition:p_max	keep order:false, stats:pseudo
+TableDual	root		rows:0
 explain format='plan_tree' select * from t where a in (2);
 id	task	access object	operator info
 TableReader	root		data:Selection
