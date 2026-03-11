@@ -1866,11 +1866,15 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 	}
 
 	if arg0IsCon && !arg1IsCon && matchRefineRule3Pattern(arg0EvalType, arg1Type) {
-		return c.refineNumericConstantCmpDatetime(ctx, args, arg0, 0), nil
+		finalArg0 = refineDatetimeArg(ctx, finalArg0, arg1Type)
+		return []Expression{finalArg0, finalArg1}, nil
+		//return c.refineNumericConstantCmpDatetime(ctx, args, arg0, 0), nil
 	}
 
 	if !arg0IsCon && arg1IsCon && matchRefineRule3Pattern(arg1EvalType, arg0Type) {
-		return c.refineNumericConstantCmpDatetime(ctx, args, arg1, 1), nil
+		finalArg1 = refineDatetimeArg(ctx, finalArg1, arg0Type)
+		return []Expression{finalArg0, finalArg1}, nil
+		//return c.refineNumericConstantCmpDatetime(ctx, args, arg1, 1), nil
 	}
 
 	// int constant [cmp] year type
@@ -1885,6 +1889,25 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 	}
 
 	return c.refineArgsByUnsignedFlag(ctx, []Expression{finalArg0, finalArg1}), nil
+}
+
+func refineDatetimeArg(ctx BuildContext, expr Expression, tp *types.FieldType) Expression {
+	exprType := expr.GetType(ctx.GetEvalCtx())
+	exprEvalType := exprType.EvalType()
+
+	switch exprEvalType {
+	case types.ETReal:
+		expr = WrapWithCastAsTime(ctx, expr, tp)
+	case types.ETDecimal:
+		expr = WrapWithCastAsTime(ctx, expr, tp)
+	case types.ETInt:
+		expr, _ = WrapWithForceIntToTime(ctx, tp, expr, ForceIntToTimeModeEqual)
+	default:
+		panic("Unknown evalType")
+	}
+
+	// types.NewFieldType(tp.GetType())?
+	return expr
 }
 
 // see https://github.com/pingcap/tidb/issues/38361 for more details

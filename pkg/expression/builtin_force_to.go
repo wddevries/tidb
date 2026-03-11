@@ -224,3 +224,74 @@ func GetForceToIntFloor(ctx BuildContext, targetFieldType types.FieldType, expr 
 func GetForceToIntEQ(ctx BuildContext, targetFieldType types.FieldType, expr *Constant, op opcode.Op) (Expression, error) {
 	return getForceToInt(ctx, targetFieldType, expr, nil)
 }
+
+type builtinForceIntToTimeSig struct {
+	baseBuiltinFunc
+	// NOTE: Any new fields added here must be thread-safe or immutable during execution,
+	// as this expression may be shared across sessions.
+	// If a field does not meet these requirements, set SafeToShareAcrossSession to false.
+	targetFieldType *types.FieldType
+	mode            ForceIntToTimeMode
+}
+
+func (b *builtinForceIntToTimeSig) cloneFrom(from *builtinForceIntToTimeSig) {
+	b.baseBuiltinFunc.cloneFrom(&from.baseBuiltinFunc)
+	b.targetFieldType = from.targetFieldType.Clone()
+	b.mode = from.mode
+}
+
+func (b *builtinForceIntToTimeSig) Clone() builtinFunc {
+	newSig := &builtinForceIntToTimeSig{}
+	newSig.cloneFrom(b)
+	return newSig
+}
+
+// ForceIntToTimeMode is used to specify rounding mode or equality for force int to time conversion.
+type ForceIntToTimeMode int
+
+const (
+	ForceIntToTimeModeFloor ForceIntToTimeMode = iota
+	ForceIntToTimeModeCeil
+	ForceIntToTimeModeEqual
+)
+
+func (b *builtinForceIntToTimeSig) evalTime(ctx EvalContext, row chunk.Row) (res types.Time, isNull bool, err error) {
+	val, isNull, err := b.args[0].EvalInt(ctx, row)
+	if isNull || err != nil {
+		return res, isNull, err
+	}
+
+	if b.args[0].GetType(ctx).GetType() == mysql.TypeYear {
+		res, err = types.ParseTimeFromYear(val)
+	} else {
+		res, err = types.ParseTimeFromNum(typeCtx(ctx), val, b.tp.GetType(), b.tp.GetDecimal())
+	}
+	if err != nil {
+		res.SetToBadInt(uint64(val))
+		return res, false, handleInvalidTimeError(ctx, err)
+	}
+	if b.tp.GetType() == mysql.TypeDate {
+		// Truncate hh:mm:ss part if the type is Date.
+		res.SetCoreTime(types.FromDate(res.Year(), res.Month(), res.Day(), 0, 0, 0, 0))
+	}
+	return res, false, nil
+}
+
+func WrapWithForceIntToTime(ctx BuildContext, targetFieldType *types.FieldType, expr Expression, mode ForceIntToTimeMode) (Expression, error) {
+	//fmt.Println("fudge2: ", expr)
+	//tp := types.NewFieldType(mysql.TypeLonglong)
+	b, err := newBaseBuiltinFunc(ctx, "ForceIntToTime", []Expression{expr}, targetFieldType)
+	if err != nil {
+		return nil, err
+	}
+
+	sig := &builtinForceIntToTimeSig{b, targetFieldType, mode}
+
+	sf := &ScalarFunction{
+		FuncName: ast.NewCIStr("ForceToInt"),
+		RetType:  targetFieldType,
+		Function: sig,
+	}
+
+	return FoldConstant(ctx, sf), nil
+}

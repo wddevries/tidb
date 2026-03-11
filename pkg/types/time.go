@@ -225,6 +225,10 @@ type Time struct {
 	coreTime
 }
 
+func (t *Time) SetToBadInt(u uint64) {
+	t.coreTime = CoreTime(u)
+}
+
 // Clock returns the hour, minute, and second within the day specified by t.
 func (t Time) Clock() (hour int, minute int, second int) {
 	return t.Hour(), t.Minute(), t.Second()
