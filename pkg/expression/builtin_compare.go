@@ -1853,16 +1853,16 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 		return c.refineIntNonConstToNonIntConst(ctx, arg1Type, finalArg1, arg0, c.op, true)
 	}
 
-	// We should remove the mutable constant for correctness, because its value may be changed.
-	if err := RemoveMutableConst(ctx, args...); err != nil {
-		return nil, err
-	}
-
 	// Handle comparison between a duration type column and a non-duration type constant.
 	if c.op == opcode.NullEQ {
+		// We should remove the mutable constant for correctness, because its value may be changed.
+		if err := RemoveMutableConst(ctx, args...); err != nil {
+			return nil, err
+		}
 		if result, err := c.handleDurationTypeComparisonForNullEq(ctx, args[0], args[1]); err != nil || result != nil {
 			return result, err
 		}
+		return c.refineArgsByUnsignedFlag(ctx, []Expression{finalArg0, finalArg1}), nil
 	}
 
 	if arg0IsCon && !arg1IsCon && matchRefineRule3Pattern(arg0EvalType, arg1Type) {
@@ -1888,7 +1888,7 @@ func (c *compareFunctionClass) refineArgs(ctx BuildContext, args []Expression) (
 		return []Expression{finalArg0, finalArg1}, nil
 	}
 
-	return c.refineArgsByUnsignedFlag(ctx, []Expression{finalArg0, finalArg1}), nil
+	return []Expression{finalArg0, finalArg1}, nil
 }
 
 func refineDatetimeArg(ctx BuildContext, expr Expression, tp *types.FieldType) Expression {
